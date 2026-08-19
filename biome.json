@@ -53,6 +53,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["src/content/overlay.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
     }
   ]
 }

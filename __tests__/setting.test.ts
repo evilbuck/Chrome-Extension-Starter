@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Settings } from '@/shared/config';
 import { SettingManager } from '@/shared/lib/setting';
 
-// Mock chrome.storage API
 const mockStorage = {
     sync: {
         get: vi.fn(),
@@ -12,7 +11,7 @@ const mockStorage = {
 
 global.chrome = {
     storage: mockStorage
-} as any;
+} as unknown as typeof chrome;
 
 interface TestSettings extends Settings {
     theme: string;
@@ -21,8 +20,8 @@ interface TestSettings extends Settings {
 }
 
 const defaultSettings = (): TestSettings => ({
-    favoriteColor: 'blue',
-    likesColor: true,
+    hideMode: 'remove',
+    showHideButtons: true,
     theme: 'dark',
     enabled: true,
     count: 0
@@ -50,19 +49,15 @@ describe('SettingManager', () => {
     describe('load()', () => {
         it('should load existing settings when properly stored', async () => {
             const storedSettings = {
-                favoriteColor: 'red',
-                likesColor: false,
+                hideMode: 'dim',
+                showHideButtons: false,
                 theme: 'light',
                 enabled: false,
                 count: 5
             };
 
-            mockStorage.sync.get.mockImplementation((keys, callback) => {
-                if (Array.isArray(keys) && keys.includes('settings')) {
-                    callback?.({ settings: storedSettings });
-                } else {
-                    callback?.({ settings: storedSettings });
-                }
+            mockStorage.sync.get.mockImplementation((_keys, callback) => {
+                callback?.({ settings: storedSettings });
             });
 
             const result = await manager.load();
@@ -72,7 +67,7 @@ describe('SettingManager', () => {
 
         it('should initialize if settings are missing', async () => {
             mockStorage.sync.get.mockImplementation((_keys, callback) => {
-                callback?.({}); // No settings stored
+                callback?.({});
             });
             mockStorage.sync.set.mockImplementation((_items, callback) => callback?.());
 
@@ -84,7 +79,7 @@ describe('SettingManager', () => {
 
         it('should initialize if settings are corrupted', async () => {
             mockStorage.sync.get.mockImplementation((_keys, callback) => {
-                callback?.({ settings: 'invalid' }); // Corrupted data (not an object)
+                callback?.({ settings: 'invalid' });
             });
             mockStorage.sync.set.mockImplementation((_items, callback) => callback?.());
 
@@ -108,8 +103,8 @@ describe('SettingManager', () => {
     describe('save()', () => {
         it('should save settings to sync storage', async () => {
             const newSettings: TestSettings = {
-                favoriteColor: 'red',
-                likesColor: true,
+                hideMode: 'dim',
+                showHideButtons: true,
                 theme: 'light',
                 enabled: false,
                 count: 10

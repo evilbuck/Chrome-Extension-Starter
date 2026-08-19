@@ -1,30 +1,17 @@
-# Chrome Extension Starter
+# eBay Enhance
 
-![release](https://github.com/carry0987/Chrome-Extension-Starter/actions/workflows/release.yml/badge.svg)
-![CI](https://github.com/carry0987/Chrome-Extension-Starter/actions/workflows/ci.yml/badge.svg)
+Chrome extension that lets you hide eBay listings you do not want. Stamp an **X** on a search card or hide the item from its listing page. Hidden IDs persist locally and stay out of later result pages.
 
-A modern **Chrome Extension Starter Template** built with **TypeScript**, **Preact**, **TailwindCSS**, **RSBuild**, and **Vitest** — fully compatible with **Manifest V3**.
-Designed for fast development, clean architecture, and strongly typed communication between extension modules.
+## Use
 
----
+1. `pnpm install`
+2. `pnpm build`
+3. Chrome → `chrome://extensions` → Developer mode → Load unpacked → select `dist/`
+4. Open an eBay search. Each real card gets an X on the photo.
+5. Open an item page to hide or restore that listing.
 
-## 🧰 Prerequisites
+Popup: hide mode (remove vs faded stamp), recent hidden items, restore. Options page: full list, search, restore all.
 
-* [Node.js](https://nodejs.org/) (LTS or Current)
-* [pnpm](https://pnpm.io/) — Recommended package manager
+## Stack
 
----
-
-## 🏗️ Core Stack
-
-* **TypeScript (ESNext)** — Strong typing & modern syntax
-* **RSBuild** — High-performance bundler optimized for modern web extensions
-* **TailwindCSS v4** — Utility-first CSS framework for responsive design
-* **Preact** — Lightweight React-compatible UI framework
-* **Vitest** — Fast unit testing powered by Vite
-
----
-
-## 📜 License
-
-[MIT](LICENSE) © 2026 carry0987
+TypeScript, Preact, Tailwind, RSBuild, Vitest. Manifest V3.

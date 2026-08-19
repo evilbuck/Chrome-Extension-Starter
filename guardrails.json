@@ -1,0 +1,70 @@
+{
+  "version": 2,
+  "targets": {
+    "coverage_min": 60,
+    "coverage_target": 75,
+    "cyclomatic_max": 10,
+    "cyclomatic_hard_ceiling": 15,
+    "patch_coverage_min": 90
+  },
+  "ratchet": {
+    "baseline_coverage": 63.65,
+    "baseline_complexity_inventory": [
+      {
+        "file": "src/shared/lib/migration.ts",
+        "function": "runMigrations",
+        "complexity": 22
+      },
+      {
+        "file": "src/components/tailgrids/core/select.tsx",
+        "function": "SelectContent",
+        "complexity": 19
+      },
+      {
+        "file": "src/shared/ebay.ts",
+        "function": "extractItemId",
+        "complexity": 13
+      },
+      {
+        "file": "src/shared/ebay.ts",
+        "function": "extractItemPageMeta",
+        "complexity": 12
+      },
+      {
+        "file": "src/content/item-page.ts",
+        "function": "syncItemPageBar",
+        "complexity": 11
+      },
+      {
+        "file": "src/content/listings.ts",
+        "function": "applyCardState",
+        "complexity": 11
+      },
+      {
+        "file": "src/content/listings.ts",
+        "function": "syncResultsBanner",
+        "complexity": 11
+      }
+    ],
+    "complexity_baseline_file": null,
+    "baseline_lint_clean": true
+  },
+  "ecosystems": [
+    {
+      "name": "typescript",
+      "detected": true,
+      "test_runner": "vitest run",
+      "coverage_tool": "vitest run --coverage --coverage.reporter=lcov",
+      "coverage_format": "lcov",
+      "complexity_tool": "lizard",
+      "complexity_cmd": "lizard -C 10 -w --csv -x \"*/.git/*\" -x \"*/.context/*\" -x \"*/.venv/*\" -x \"*/coverage/*\" -x \"*/dist/*\" -x \"*/build/*\" -x \"*/node_modules/*\" -x \"*/vendor/*\" -x \"*/target/*\" -x \"*/.next/*\" -x \"*/.nuxt/*\" -x \"*/.turbo/*\" .",
+      "lint_cmd": "biome check",
+      "lint_accepts_paths": true,
+      "functional_test_cmd": null,
+      "configured_not_installed": [],
+      "detection_signals": ["package.json", "tsconfig.json", "*.ts"]
+    }
+  ],
+  "git_compare_branch": "origin/master",
+  "complexity_baseline": []
+}

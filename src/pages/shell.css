@@ -1,0 +1,41 @@
+.ee-shell {
+    --ee-ink: #1c1612;
+    --ee-paper: #f3ecdf;
+    --ee-stamp: #b42318;
+    --ee-rule: #d7ccbc;
+    color: var(--ee-ink);
+    background: radial-gradient(circle at top right, rgba(180, 35, 24, 0.08), transparent 34%), var(--ee-paper);
+    font-family: "Iowan Old Style", Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
+}
+
+.ee-shell h1,
+.ee-shell h2 {
+    letter-spacing: -0.03em;
+}
+
+.ee-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1.5px solid var(--ee-stamp);
+    border-radius: 999px;
+    color: var(--ee-stamp);
+    font-weight: 700;
+    line-height: 1;
+}
+
+.ee-thumb {
+    width: 2.75rem;
+    height: 2.75rem;
+    object-fit: cover;
+    background: #e8dfd0;
+    border: 1px solid var(--ee-rule);
+}
+
+.ee-clamp {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}

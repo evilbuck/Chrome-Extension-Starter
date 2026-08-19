@@ -1,5 +1,15 @@
 import type { MSG, MESSAGE_SPEC } from '@/shared/constants';
 
+export interface HiddenItem {
+    id: string;
+    title: string;
+    url: string;
+    thumbnail: string;
+    hiddenAt: number;
+}
+
+export type HiddenItemsMap = Record<string, HiddenItem>;
+
 // Build a default message map from MSG keys
 export type InferMessageMap<T extends Record<string, string>> = {
     [K in keyof T]: { req?: unknown; res?: unknown };
@@ -32,23 +42,17 @@ export interface ErrorResponse {
 // Typed storage schema used by createTypedStorage
 export interface StorageSchema {
     local: {
-        // example keys; adjust to your extension needs
-        darkMode: boolean;
-        username: string;
+        hiddenItems: HiddenItemsMap;
     };
     sync: {
-        settings: unknown; // Settings object from setting.ts
+        settings: unknown;
         version: string;
     };
-    // Managed storage is policy-controlled and read-only
     managed: {
-        // example keys; adjust to your enterprise policy schema
         orgEnabled: boolean;
         allowedHosts: string[];
     };
-    // Session storage is ephemeral (lives with the service worker session)
     session: {
-        // example keys; adjust to your extension needs
         lastVisited: string | null;
         tempToken: string | null;
     };

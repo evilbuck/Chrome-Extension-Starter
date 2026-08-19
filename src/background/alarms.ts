@@ -1,4 +1,3 @@
-import { settingsManager } from '@/shared/config';
 import { ALARMS } from '@/shared/constants';
 import { logger } from '@/shared/lib/logger';
 import { kv } from '@/shared/lib/storage';
@@ -43,14 +42,6 @@ chrome.alarms.onAlarm.addListener(async (a) => {
         case ALARMS.POLL: {
             try {
                 logger.debug('[alarms] POLL tick', new Date().toISOString());
-
-                // Example: fetch user settings from storage using settingsManager
-                const settings = await settingsManager.load();
-                if (settings.likesColor) {
-                    logger.debug(`[alarms] User likes color: ${settings.favoriteColor}`);
-                }
-
-                // TODO: perform your background task here (e.g., API call, cache cleanup)
             } catch (err) {
                 logger.error('[alarms] POLL error', err);
             }

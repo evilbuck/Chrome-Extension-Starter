@@ -1,140 +1,159 @@
 {
   "extName": {
-    "message": "Chrome Extension Starter",
+    "message": "eBay Enhance",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "Chrome Extension Starter, using TypeScript, Preact, TailwindCSS, Vitest and RSBuild.",
+    "message": "Hide eBay listings you do not want, on search results and item pages.",
     "description": "Extension description"
   },
   "popupTitle": {
-    "message": "Extension Popup",
-    "description": "Popup page title"
+    "message": "eBay Enhance",
+    "description": "Popup title"
   },
   "optionsTitle": {
-    "message": "Extension Options",
-    "description": "Options page title"
+    "message": "Hidden listings",
+    "description": "Options title"
   },
-  "currentURL": {
-    "message": "Current URL",
-    "description": "Label for current URL"
+  "optionsDescription": {
+    "message": "Listings you stamp stay hidden on eBay until you restore them.",
+    "description": "Options description"
   },
-  "clickCount": {
-    "message": "Click count",
-    "description": "Label for click counter"
-  },
-  "clickMe": {
-    "message": "Click me!",
-    "description": "Button text"
-  },
-  "changeBackground": {
-    "message": "Change Background",
-    "description": "Button to change page background"
+  "openPopup": {
+    "message": "Open eBay Enhance",
+    "description": "Toolbar tooltip"
   },
   "loadingSettings": {
-    "message": "Loading settings...",
-    "description": "Loading state message"
-  },
-  "settings": {
-    "message": "Settings",
-    "description": "Settings section title"
-  },
-  "favoriteColor": {
-    "message": "Favorite Color",
-    "description": "Favorite color setting label"
-  },
-  "favoriteColorDescription": {
-    "message": "Choose the accent color used by extension actions.",
-    "description": "Helper text for the favorite color select"
-  },
-  "colorRed": {
-    "message": "Red",
-    "description": "Color option: red"
-  },
-  "colorGreen": {
-    "message": "Green",
-    "description": "Color option: green"
-  },
-  "colorBlue": {
-    "message": "Blue",
-    "description": "Color option: blue"
-  },
-  "colorYellow": {
-    "message": "Yellow",
-    "description": "Color option: yellow"
-  },
-  "colorPurple": {
-    "message": "Purple",
-    "description": "Color option: purple"
-  },
-  "colorOrange": {
-    "message": "Orange",
-    "description": "Color option: orange"
-  },
-  "likesColor": {
-    "message": "I like colors",
-    "description": "Toggle for color preference"
+    "message": "Loading…",
+    "description": "Loading label"
   },
   "save": {
     "message": "Save",
     "description": "Save button"
   },
-  "cancel": {
-    "message": "Cancel",
-    "description": "Cancel button"
-  },
   "saved": {
-    "message": "Saved!",
-    "description": "Save success message"
-  },
-  "error": {
-    "message": "Error",
-    "description": "Error message prefix"
+    "message": "Saved",
+    "description": "Save success"
   },
   "failedToLoad": {
-    "message": "Failed to load settings",
-    "description": "Error loading settings"
+    "message": "Could not load settings",
+    "description": "Load error"
   },
   "failedToSave": {
-    "message": "Failed to save settings",
-    "description": "Error saving settings"
-  },
-  "optionsDescription": {
-    "message": "Configure the extension using TailGrids-first form controls.",
-    "description": "Description shown at the top of the options page"
-  },
-  "appearanceTab": {
-    "message": "Appearance",
-    "description": "Tab title for appearance settings"
-  },
-  "behaviorTab": {
-    "message": "Behavior",
-    "description": "Tab title for behavior settings"
-  },
-  "likesColorDescription": {
-    "message": "Use the selected color when applying changes.",
-    "description": "Helper text for the color preference toggle"
+    "message": "Could not save settings",
+    "description": "Save error"
   },
   "enabled": {
-    "message": "Enabled",
-    "description": "Generic enabled state label"
+    "message": "On",
+    "description": "Toggle on"
   },
   "disabled": {
-    "message": "Disabled",
-    "description": "Generic disabled state label"
+    "message": "Off",
+    "description": "Toggle off"
   },
-  "backgroundChanged": {
-    "message": "Background set to $COLOR$",
-    "description": "Message shown when background color changes",
+  "hideListing": {
+    "message": "Hide this listing",
+    "description": "Hide action"
+  },
+  "unhideListing": {
+    "message": "Show this listing",
+    "description": "Unhide action"
+  },
+  "hiddenCount": {
+    "message": "$1 hidden",
+    "description": "Hidden count",
     "placeholders": {
-      "color": {
-        "content": "$1",
-        "example": "blue"
+      "count": {
+        "content": "$1"
       }
     }
   },
-  "openPopup": {
-    "message": "Open Extension Popup",
-    "description": "Default title for extension action"
+  "showHidden": {
+    "message": "Show hidden listings",
+    "description": "Reveal removed cards"
+  },
+  "hideAgain": {
+    "message": "Hide them again",
+    "description": "Re-apply removal"
+  },
+  "itemHiddenToast": {
+    "message": "Hidden from your listings",
+    "description": "Undo toast"
+  },
+  "undo": {
+    "message": "Undo",
+    "description": "Undo hide"
+  },
+  "itemPageHidden": {
+    "message": "You hid this listing.",
+    "description": "Item page hidden state"
+  },
+  "itemPageVisible": {
+    "message": "Not interested? Hide it from future search results.",
+    "description": "Item page visible state"
+  },
+  "hideModeRemove": {
+    "message": "Remove from results",
+    "description": "Hide mode label"
+  },
+  "hideModeRemoveHint": {
+    "message": "Off keeps a stamped, faded card so you can still see what you rejected.",
+    "description": "Hide mode hint"
+  },
+  "showHideButtons": {
+    "message": "Show X on listing cards",
+    "description": "Button visibility"
+  },
+  "showHideButtonsHint": {
+    "message": "Turn off to keep already-hidden items hidden without showing the stamp control.",
+    "description": "Button visibility hint"
+  },
+  "recentHidden": {
+    "message": "Recently hidden",
+    "description": "Recent list heading"
+  },
+  "noHiddenItems": {
+    "message": "Nothing hidden yet. Stamp an X on a listing to start.",
+    "description": "Empty recent list"
+  },
+  "emptyHidden": {
+    "message": "No hidden listings match.",
+    "description": "Empty filtered list"
+  },
+  "restore": {
+    "message": "Restore",
+    "description": "Restore one item"
+  },
+  "restoreAll": {
+    "message": "Restore all",
+    "description": "Clear hidden list"
+  },
+  "confirmClear": {
+    "message": "Confirm restore all",
+    "description": "Second-click confirm"
+  },
+  "manageAll": {
+    "message": "Manage all",
+    "description": "Open options"
+  },
+  "searchHidden": {
+    "message": "Search hidden listings",
+    "description": "Options search"
+  },
+  "hiddenTab": {
+    "message": "Hidden",
+    "description": "Options hidden tab"
+  },
+  "settingsTab": {
+    "message": "Settings",
+    "description": "Options settings tab"
+  },
+  "onEbayHint": {
+    "message": "Stamp an X on any listing to keep it out of your way.",
+    "description": "On eBay popup hint"
+  },
+  "notOnEbayHint": {
+    "message": "Open an eBay search or item page to hide listings.",
+    "description": "Off eBay popup hint"
   }
 }

@@ -1,140 +1,159 @@
 {
   "extName": {
-    "message": "Chrome拡張機能スターター",
+    "message": "eBay Enhance",
     "description": "拡張機能名"
   },
   "extDescription": {
-    "message": "TypeScript、Preact、TailwindCSS、Vitest、RSBuildを使用したChrome拡張機能スターター。",
+    "message": "興味のないeBay出品を検索結果と商品ページから非表示にします。",
     "description": "拡張機能の説明"
   },
   "popupTitle": {
-    "message": "拡張機能ポップアップ",
-    "description": "ポップアップページのタイトル"
+    "message": "eBay Enhance",
+    "description": "ポップアップのタイトル"
   },
   "optionsTitle": {
-    "message": "拡張機能オプション",
-    "description": "オプションページのタイトル"
+    "message": "非表示にした出品",
+    "description": "オプションのタイトル"
   },
-  "currentURL": {
-    "message": "現在のURL",
-    "description": "現在のURLのラベル"
+  "optionsDescription": {
+    "message": "×を付けた出品は、復元するまでeBay上で非表示のままです。",
+    "description": "オプションの説明"
   },
-  "clickCount": {
-    "message": "クリック数",
-    "description": "クリックカウンターのラベル"
-  },
-  "clickMe": {
-    "message": "クリックしてください！",
-    "description": "ボタンのテキスト"
-  },
-  "changeBackground": {
-    "message": "背景を変更",
-    "description": "ページの背景を変更するボタン"
+  "openPopup": {
+    "message": "eBay Enhanceを開く",
+    "description": "ツールバーのツールチップ"
   },
   "loadingSettings": {
-    "message": "設定を読み込み中...",
-    "description": "読み込み状態のメッセージ"
-  },
-  "settings": {
-    "message": "設定",
-    "description": "設定セクションのタイトル"
-  },
-  "favoriteColor": {
-    "message": "好きな色",
-    "description": "好きな色の設定ラベル"
-  },
-  "favoriteColorDescription": {
-    "message": "拡張機能の操作で使うアクセントカラーを選択します。",
-    "description": "好きな色のセレクト用補助テキスト"
-  },
-  "colorRed": {
-    "message": "赤",
-    "description": "色のオプション：赤"
-  },
-  "colorGreen": {
-    "message": "緑",
-    "description": "色のオプション：緑"
-  },
-  "colorBlue": {
-    "message": "青",
-    "description": "色のオプション：青"
-  },
-  "colorYellow": {
-    "message": "黄",
-    "description": "色のオプション：黄"
-  },
-  "colorPurple": {
-    "message": "紫",
-    "description": "色のオプション：紫"
-  },
-  "colorOrange": {
-    "message": "オレンジ",
-    "description": "色のオプション：オレンジ"
-  },
-  "likesColor": {
-    "message": "色が好きです",
-    "description": "色の好みのトグル"
+    "message": "読み込み中…",
+    "description": "読み込み表示"
   },
   "save": {
     "message": "保存",
     "description": "保存ボタン"
   },
-  "cancel": {
-    "message": "キャンセル",
-    "description": "キャンセルボタン"
-  },
   "saved": {
-    "message": "保存しました！",
-    "description": "保存成功メッセージ"
-  },
-  "error": {
-    "message": "エラー",
-    "description": "エラーメッセージのプレフィックス"
+    "message": "保存しました",
+    "description": "保存成功"
   },
   "failedToLoad": {
-    "message": "設定の読み込みに失敗しました",
-    "description": "設定の読み込みエラー"
+    "message": "設定を読み込めませんでした",
+    "description": "読み込みエラー"
   },
   "failedToSave": {
-    "message": "設定の保存に失敗しました",
-    "description": "設定の保存エラー"
-  },
-  "optionsDescription": {
-    "message": "TailGrids ベースのフォームコントロールで拡張機能を設定します。",
-    "description": "オプションページ上部に表示する説明"
-  },
-  "appearanceTab": {
-    "message": "外観",
-    "description": "外観設定タブのタイトル"
-  },
-  "behaviorTab": {
-    "message": "動作",
-    "description": "動作設定タブのタイトル"
-  },
-  "likesColorDescription": {
-    "message": "変更を適用するときに選択した色を使用します。",
-    "description": "色設定トグルの補助テキスト"
+    "message": "設定を保存できませんでした",
+    "description": "保存エラー"
   },
   "enabled": {
-    "message": "有効",
-    "description": "汎用的な有効状態ラベル"
+    "message": "オン",
+    "description": "トグルオン"
   },
   "disabled": {
-    "message": "無効",
-    "description": "汎用的な無効状態ラベル"
+    "message": "オフ",
+    "description": "トグルオフ"
   },
-  "backgroundChanged": {
-    "message": "背景を$COLOR$に設定しました",
-    "description": "背景色が変更されたときに表示されるメッセージ",
+  "hideListing": {
+    "message": "この出品を非表示",
+    "description": "非表示アクション"
+  },
+  "unhideListing": {
+    "message": "この出品を再表示",
+    "description": "再表示アクション"
+  },
+  "hiddenCount": {
+    "message": "$1件を非表示",
+    "description": "非表示件数",
     "placeholders": {
-      "color": {
-        "content": "$1",
-        "example": "青"
+      "count": {
+        "content": "$1"
       }
     }
   },
-  "openPopup": {
-    "message": "拡張機能ポップアップを開く",
-    "description": "拡張機能アクションのデフォルトタイトル"
+  "showHidden": {
+    "message": "非表示の出品を見る",
+    "description": "再表示"
+  },
+  "hideAgain": {
+    "message": "もう一度隠す",
+    "description": "再非表示"
+  },
+  "itemHiddenToast": {
+    "message": "出品を非表示にしました",
+    "description": "取り消しトースト"
+  },
+  "undo": {
+    "message": "元に戻す",
+    "description": "取り消し"
+  },
+  "itemPageHidden": {
+    "message": "この出品は非表示にしています。",
+    "description": "商品ページの非表示状態"
+  },
+  "itemPageVisible": {
+    "message": "興味がなければ、今後の検索結果から非表示にできます。",
+    "description": "商品ページの表示状態"
+  },
+  "hideModeRemove": {
+    "message": "検索結果から取り除く",
+    "description": "非表示モード"
+  },
+  "hideModeRemoveHint": {
+    "message": "オフにすると、却下した出品が薄い表示のまま残ります。",
+    "description": "非表示モードの説明"
+  },
+  "showHideButtons": {
+    "message": "出品カードに×を表示",
+    "description": "ボタン表示"
+  },
+  "showHideButtonsHint": {
+    "message": "オフにすると、すでに非表示の出品は隠したまま操作ボタンを消します。",
+    "description": "ボタン表示の説明"
+  },
+  "recentHidden": {
+    "message": "最近非表示にした出品",
+    "description": "最近の一覧"
+  },
+  "noHiddenItems": {
+    "message": "まだ何も非表示にしていません。出品の×を押してください。",
+    "description": "空の一覧"
+  },
+  "emptyHidden": {
+    "message": "一致する非表示出品はありません。",
+    "description": "検索結果なし"
+  },
+  "restore": {
+    "message": "復元",
+    "description": "1件復元"
+  },
+  "restoreAll": {
+    "message": "すべて復元",
+    "description": "全件復元"
+  },
+  "confirmClear": {
+    "message": "すべて復元してよい",
+    "description": "確認"
+  },
+  "manageAll": {
+    "message": "すべて管理",
+    "description": "オプションを開く"
+  },
+  "searchHidden": {
+    "message": "非表示出品を検索",
+    "description": "検索"
+  },
+  "hiddenTab": {
+    "message": "非表示",
+    "description": "非表示タブ"
+  },
+  "settingsTab": {
+    "message": "設定",
+    "description": "設定タブ"
+  },
+  "onEbayHint": {
+    "message": "出品の×を押すと、以後その出品を避けられます。",
+    "description": "eBay上のヒント"
+  },
+  "notOnEbayHint": {
+    "message": "eBayの検索または商品ページを開いて出品を非表示にできます。",
+    "description": "eBay外のヒント"
   }
 }

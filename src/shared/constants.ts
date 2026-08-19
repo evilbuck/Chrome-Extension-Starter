@@ -8,23 +8,18 @@ export const ALARMS = {
 } as const;
 
 export enum MSG {
-    CHANGE_BG = 'CHANGE_BG'
+    HIDDEN_CHANGED = 'HIDDEN_CHANGED'
 }
 
 export const MESSAGE_SPEC = {
-    // example: provide strict typing for CHANGE_BG
-    [MSG.CHANGE_BG]: {
-        req: {} as { color: string },
-        res: {} as { ok: boolean } // optional
+    [MSG.HIDDEN_CHANGED]: {
+        req: {} as { count: number },
+        res: {} as { ok: boolean }
     }
-
-    // add more overrides here...
 } as const;
 
 export const RESTRICTED = {
-    // common internal schemes we should not run on
     schemes: ['chrome', 'chrome-extension', 'chrome-untrusted', 'devtools', 'edge', 'about'],
-    // urls where extension UI is forbidden (Chrome/Edge web stores)
     hosts: [
         /^(?:https?:\/\/)?chrome\.google\.com\/webstore\/?/i,
         /^(?:https?:\/\/)?microsoftedge\.microsoft\.com\/addons\/?/i
@@ -32,3 +27,44 @@ export const RESTRICTED = {
 } as const;
 
 export type RestrictedScheme = (typeof RESTRICTED.schemes)[number];
+
+export const EBAY_MATCHES = [
+    '*://*.ebay.com/*',
+    '*://ebay.com/*',
+    '*://*.ebay.co.uk/*',
+    '*://ebay.co.uk/*',
+    '*://*.ebay.com.au/*',
+    '*://ebay.com.au/*',
+    '*://*.ebay.ca/*',
+    '*://ebay.ca/*',
+    '*://*.ebay.de/*',
+    '*://ebay.de/*',
+    '*://*.ebay.fr/*',
+    '*://ebay.fr/*',
+    '*://*.ebay.it/*',
+    '*://ebay.it/*',
+    '*://*.ebay.es/*',
+    '*://ebay.es/*',
+    '*://*.ebay.nl/*',
+    '*://ebay.nl/*',
+    '*://*.ebay.be/*',
+    '*://ebay.be/*',
+    '*://*.ebay.at/*',
+    '*://ebay.at/*',
+    '*://*.ebay.ch/*',
+    '*://ebay.ch/*',
+    '*://*.ebay.ie/*',
+    '*://ebay.ie/*',
+    '*://*.ebay.pl/*',
+    '*://ebay.pl/*',
+    '*://*.ebay.com.sg/*',
+    '*://ebay.com.sg/*',
+    '*://*.ebay.com.hk/*',
+    '*://ebay.com.hk/*',
+    '*://*.ebay.com.my/*',
+    '*://ebay.com.my/*',
+    '*://*.ebay.ph/*',
+    '*://ebay.ph/*',
+    '*://*.ebay.in/*',
+    '*://ebay.in/*'
+];

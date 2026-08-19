@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '@/shared/lib/logger';
 
-const NS = '[Chrome-Extension-Starter]';
+const NS = '[eBay Enhance]';
 
 describe('Logger', () => {
     beforeEach(() => {

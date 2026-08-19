@@ -1,5 +1,5 @@
 type Level = 'debug' | 'info' | 'warn' | 'error';
-const NS = '[Chrome-Extension-Starter]';
+const NS = '[eBay Enhance]';
 const isDev = process.env.NODE_ENV !== 'production';
 
 const noop = () => {};

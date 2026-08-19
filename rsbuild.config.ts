@@ -66,8 +66,8 @@ export default defineConfig({
                     popup: './src/pages/popup/index.tsx',
                     options: './src/pages/options/index.tsx',
                     content: {
-                        import: './src/content/index.tsx',
-                        html: false // No HTML for content script
+                        import: './src/content/index.ts',
+                        html: false
                     }
                 }
             },

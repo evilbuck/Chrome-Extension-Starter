@@ -1,140 +1,159 @@
 {
   "extName": {
-    "message": "Chrome 擴充功能起始模板",
+    "message": "eBay Enhance",
     "description": "擴充功能名稱"
   },
   "extDescription": {
-    "message": "使用 TypeScript、Preact、TailwindCSS、Vitest 和 RSBuild 的 Chrome 擴充功能起始模板。",
-    "description": "擴充功能描述"
+    "message": "在搜尋結果與商品頁把不想看的 eBay 刊登隱藏起來。",
+    "description": "擴充功能說明"
   },
   "popupTitle": {
-    "message": "擴充功能彈出視窗",
+    "message": "eBay Enhance",
     "description": "彈出視窗標題"
   },
   "optionsTitle": {
-    "message": "擴充功能選項",
-    "description": "選項頁面標題"
+    "message": "已隱藏的刊登",
+    "description": "選項標題"
   },
-  "currentURL": {
-    "message": "目前網址",
-    "description": "目前網址標籤"
+  "optionsDescription": {
+    "message": "被你蓋上 × 的刊登會一直隱藏，直到你把它還原。",
+    "description": "選項說明"
   },
-  "clickCount": {
-    "message": "點擊次數",
-    "description": "點擊計數器標籤"
-  },
-  "clickMe": {
-    "message": "點我！",
-    "description": "按鈕文字"
-  },
-  "changeBackground": {
-    "message": "變更背景",
-    "description": "變更頁面背景的按鈕"
+  "openPopup": {
+    "message": "開啟 eBay Enhance",
+    "description": "工具列提示"
   },
   "loadingSettings": {
-    "message": "載入設定中...",
-    "description": "載入狀態訊息"
-  },
-  "settings": {
-    "message": "設定",
-    "description": "設定區段標題"
-  },
-  "favoriteColor": {
-    "message": "最愛的顏色",
-    "description": "最愛顏色設定標籤"
-  },
-  "favoriteColorDescription": {
-    "message": "選擇擴充功能操作時使用的主色。",
-    "description": "最愛顏色選單的輔助文字"
-  },
-  "colorRed": {
-    "message": "紅色",
-    "description": "顏色選項：紅色"
-  },
-  "colorGreen": {
-    "message": "綠色",
-    "description": "顏色選項：綠色"
-  },
-  "colorBlue": {
-    "message": "藍色",
-    "description": "顏色選項：藍色"
-  },
-  "colorYellow": {
-    "message": "黃色",
-    "description": "顏色選項：黃色"
-  },
-  "colorPurple": {
-    "message": "紫色",
-    "description": "顏色選項：紫色"
-  },
-  "colorOrange": {
-    "message": "橙色",
-    "description": "顏色選項：橙色"
-  },
-  "likesColor": {
-    "message": "我喜歡顏色",
-    "description": "顏色偏好開關"
+    "message": "載入中…",
+    "description": "載入中"
   },
   "save": {
     "message": "儲存",
     "description": "儲存按鈕"
   },
-  "cancel": {
-    "message": "取消",
-    "description": "取消按鈕"
-  },
   "saved": {
-    "message": "已儲存！",
-    "description": "儲存成功訊息"
-  },
-  "error": {
-    "message": "錯誤",
-    "description": "錯誤訊息前綴"
+    "message": "已儲存",
+    "description": "儲存成功"
   },
   "failedToLoad": {
-    "message": "載入設定失敗",
-    "description": "載入設定錯誤"
+    "message": "無法載入設定",
+    "description": "載入失敗"
   },
   "failedToSave": {
-    "message": "儲存設定失敗",
-    "description": "儲存設定錯誤"
-  },
-  "optionsDescription": {
-    "message": "使用 TailGrids 風格的表單控制來設定這個擴充功能。",
-    "description": "顯示在選項頁頂部的描述"
-  },
-  "appearanceTab": {
-    "message": "外觀",
-    "description": "外觀設定分頁標題"
-  },
-  "behaviorTab": {
-    "message": "行為",
-    "description": "行為設定分頁標題"
-  },
-  "likesColorDescription": {
-    "message": "套用變更時使用目前選擇的顏色。",
-    "description": "顏色偏好開關的輔助文字"
+    "message": "無法儲存設定",
+    "description": "儲存失敗"
   },
   "enabled": {
-    "message": "已啟用",
-    "description": "通用啟用狀態標籤"
+    "message": "開",
+    "description": "開啟"
   },
   "disabled": {
-    "message": "已停用",
-    "description": "通用停用狀態標籤"
+    "message": "關",
+    "description": "關閉"
   },
-  "backgroundChanged": {
-    "message": "背景已設為 $COLOR$",
-    "description": "背景顏色變更時顯示的訊息",
+  "hideListing": {
+    "message": "隱藏這個刊登",
+    "description": "隱藏"
+  },
+  "unhideListing": {
+    "message": "重新顯示這個刊登",
+    "description": "取消隱藏"
+  },
+  "hiddenCount": {
+    "message": "已隱藏 $1 筆",
+    "description": "隱藏數量",
     "placeholders": {
-      "color": {
-        "content": "$1",
-        "example": "藍色"
+      "count": {
+        "content": "$1"
       }
     }
   },
-  "openPopup": {
-    "message": "開啟擴充功能彈出視窗",
-    "description": "擴充功能動作的預設標題"
+  "showHidden": {
+    "message": "顯示已隱藏刊登",
+    "description": "暫時顯示"
+  },
+  "hideAgain": {
+    "message": "再次隱藏",
+    "description": "重新隱藏"
+  },
+  "itemHiddenToast": {
+    "message": "已從列表隱藏",
+    "description": "復原提示"
+  },
+  "undo": {
+    "message": "復原",
+    "description": "復原"
+  },
+  "itemPageHidden": {
+    "message": "你已隱藏這個刊登。",
+    "description": "商品頁已隱藏"
+  },
+  "itemPageVisible": {
+    "message": "不感興趣？可以把它從之後的搜尋結果藏起來。",
+    "description": "商品頁未隱藏"
+  },
+  "hideModeRemove": {
+    "message": "從結果中移除",
+    "description": "隱藏模式"
+  },
+  "hideModeRemoveHint": {
+    "message": "關閉後會留下淡化、蓋上 Hidden 的卡片，方便辨識你拒絕過的刊登。",
+    "description": "隱藏模式說明"
+  },
+  "showHideButtons": {
+    "message": "在刊登卡片顯示 ×",
+    "description": "按鈕顯示"
+  },
+  "showHideButtonsHint": {
+    "message": "關閉後仍會隱藏已標記的刊登，只是不再顯示操作按鈕。",
+    "description": "按鈕顯示說明"
+  },
+  "recentHidden": {
+    "message": "最近隱藏",
+    "description": "最近清單"
+  },
+  "noHiddenItems": {
+    "message": "還沒有隱藏任何刊登。在卡片上按 × 即可開始。",
+    "description": "空清單"
+  },
+  "emptyHidden": {
+    "message": "沒有符合的已隱藏刊登。",
+    "description": "搜尋無結果"
+  },
+  "restore": {
+    "message": "還原",
+    "description": "還原一筆"
+  },
+  "restoreAll": {
+    "message": "全部還原",
+    "description": "清空"
+  },
+  "confirmClear": {
+    "message": "確認全部還原",
+    "description": "二次確認"
+  },
+  "manageAll": {
+    "message": "管理全部",
+    "description": "開啟選項"
+  },
+  "searchHidden": {
+    "message": "搜尋已隱藏刊登",
+    "description": "搜尋"
+  },
+  "hiddenTab": {
+    "message": "已隱藏",
+    "description": "隱藏分頁"
+  },
+  "settingsTab": {
+    "message": "設定",
+    "description": "設定分頁"
+  },
+  "onEbayHint": {
+    "message": "在任何刊登上蓋 ×，之後就不用再看它。",
+    "description": "在 eBay 上的提示"
+  },
+  "notOnEbayHint": {
+    "message": "打開 eBay 搜尋或商品頁即可隱藏刊登。",
+    "description": "不在 eBay 的提示"
   }
 }
