@@ -12,6 +12,10 @@ Chrome extension that lets you hide eBay listings you do not want. Stamp an **X*
 
 Popup: hide mode (remove vs faded stamp), recent hidden items, restore. Options page: full list, search, restore all.
 
+## Package
+
+`pnpm package` runs `pnpm build:prod` and writes `releases/ebay-enhance-v<version>.zip`. The zip root is `dist/` (manifest at the top). Upload that file to the Chrome Web Store.
+
 ## Stack
 
 TypeScript, Preact, Tailwind, RSBuild, Vitest. Manifest V3.

@@ -1,5 +1,5 @@
 import type { Settings } from '@/shared/config';
-import { collectListingCards, listingFromCard } from '@/shared/ebay';
+import { collectListingCards, type ListingRef, listingFromCard } from '@/shared/ebay';
 import { hideItem, unhideItem } from '@/shared/hidden-items';
 import type { HiddenItemsMap } from '@/shared/types';
 
@@ -155,19 +155,42 @@ const showUndoToast = (onUndo: () => void): void => {
     }, 4000);
 };
 
+const eventTargetElement = (event: Event): Element | null => {
+    const raw = event.target;
+    if (raw instanceof Element) return raw;
+    if (raw instanceof Node) return raw.parentElement;
+    return null;
+};
+
+const listingFromHideButton = (button: HTMLButtonElement): ListingRef | null => {
+    const card = button.parentElement?.closest<HTMLElement>(
+        '[data-ee-item-id], li.s-card, li.s-item, [data-listingid]'
+    );
+    const fromCard = card ? listingFromCard(card) : null;
+    if (fromCard) return fromCard;
+
+    const id = button.dataset.eeItemId;
+    if (!id) return null;
+    return {
+        id,
+        title: '',
+        url: `https://www.ebay.com/itm/${id}`,
+        thumbnail: ''
+    };
+};
+
 export const handleListingClick = async (event: Event, state: ListingSurfaceState): Promise<boolean> => {
-    const target = event.target;
-    if (!(target instanceof Element)) return false;
+    const target = eventTargetElement(event);
+    if (!target) return false;
     const button = target.closest<HTMLButtonElement>(`.${BTN_CLASS}`);
     if (!button) return false;
-
-    const card = button.closest<HTMLElement>('[data-ee-item-id], li.s-card, li.s-item, [data-listingid]');
-    const listing = card ? listingFromCard(card) : null;
-    if (!listing) return false;
 
     event.preventDefault();
     event.stopPropagation();
     event.stopImmediatePropagation();
+
+    const listing = listingFromHideButton(button);
+    if (!listing) return false;
 
     if (state.hidden[listing.id]) {
         delete state.hidden[listing.id];
