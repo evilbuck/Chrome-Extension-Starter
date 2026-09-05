@@ -15,10 +15,6 @@
     "message": "擴充功能選項",
     "description": "選項頁面標題"
   },
-  "currentURL": {
-    "message": "目前網址",
-    "description": "目前網址標籤"
-  },
   "clickCount": {
     "message": "點擊次數",
     "description": "點擊計數器標籤"
@@ -27,10 +23,6 @@
     "message": "點我！",
     "description": "按鈕文字"
   },
-  "changeBackground": {
-    "message": "變更背景",
-    "description": "變更頁面背景的按鈕"
-  },
   "loadingSettings": {
     "message": "載入設定中...",
     "description": "載入狀態訊息"
@@ -38,14 +30,6 @@
   "settings": {
     "message": "設定",
     "description": "設定區段標題"
-  },
-  "favoriteColor": {
-    "message": "最愛的顏色",
-    "description": "最愛顏色設定標籤"
-  },
-  "favoriteColorDescription": {
-    "message": "選擇擴充功能操作時使用的主色。",
-    "description": "最愛顏色選單的輔助文字"
   },
   "colorRed": {
     "message": "紅色",
@@ -71,25 +55,9 @@
     "message": "橙色",
     "description": "顏色選項：橙色"
   },
-  "likesColor": {
-    "message": "我喜歡顏色",
-    "description": "顏色偏好開關"
-  },
-  "save": {
-    "message": "儲存",
-    "description": "儲存按鈕"
-  },
   "cancel": {
     "message": "取消",
     "description": "取消按鈕"
-  },
-  "saved": {
-    "message": "已儲存！",
-    "description": "儲存成功訊息"
-  },
-  "error": {
-    "message": "錯誤",
-    "description": "錯誤訊息前綴"
   },
   "failedToLoad": {
     "message": "載入設定失敗",
@@ -136,5 +104,77 @@
   "openPopup": {
     "message": "開啟擴充功能彈出視窗",
     "description": "擴充功能動作的預設標題"
+  },
+  "transportTitle": {
+    "message": "傳輸 — 擴充功能內 WebRTC"
+  },
+  "transportDescription": {
+    "message": "在實際 LAN / tailnet 路徑上,於主機與用戶端之間手動建立 offer / 設定。Phase 2 傳輸閘。"
+  },
+  "transportState": {
+    "message": "狀態"
+  },
+  "transportRole": {
+    "message": "角色"
+  },
+  "transportError": {
+    "message": "錯誤"
+  },
+  "transportLocalDescriptor": {
+    "message": "本機描述子"
+  },
+  "transportRemoteDescriptor": {
+    "message": "遠端描述子 (從對等點貼上)"
+  },
+  "transportStartHost": {
+    "message": "啟動主機 (建立 offer)"
+  },
+  "transportStartClient": {
+    "message": "啟動用戶端 (接受 offer)"
+  },
+  "transportApplyAnswer": {
+    "message": "套用遠端 answer"
+  },
+  "transportDisconnect": {
+    "message": "中斷連線"
+  },
+  "transportStatus": {
+    "message": "傳輸狀態"
+  },
+  "transportStatusDescription": {
+    "message": "擴充功能內 WebRTC 傳輸的狀態。Phase 2 傳輸閘。"
+  },
+  "loading": {
+    "message": "載入中..."
+  },
+  "requestTitle": {
+    "message": "目前請求"
+  },
+  "requestState": {
+    "message": "狀態"
+  },
+  "requestOutcome": {
+    "message": "結果"
+  },
+  "requestNoController": {
+    "message": "應用程式控制器尚未實作。Phase 4 將 applicationKey=\"unspecified\" 維持為 REQUEST_NOT_SUPPORTED,直到 Phase 6/7/8 提供支援的契約。"
+  },
+  "syncAuth": {
+    "message": "sync auth"
+  },
+  "cancelRequest": {
+    "message": "取消"
+  },
+  "roleTitle": {
+    "message": "本機角色 (僅限本機)"
+  },
+  "roleDescription": {
+    "message": "儲存於 chrome.storage.local。不會跨裝置同步。"
+  },
+  "roleHost": {
+    "message": "主機"
+  },
+  "roleClient": {
+    "message": "用戶端"
   }
 }

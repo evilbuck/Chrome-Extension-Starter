@@ -15,10 +15,6 @@
     "message": "拡張機能オプション",
     "description": "オプションページのタイトル"
   },
-  "currentURL": {
-    "message": "現在のURL",
-    "description": "現在のURLのラベル"
-  },
   "clickCount": {
     "message": "クリック数",
     "description": "クリックカウンターのラベル"
@@ -27,10 +23,6 @@
     "message": "クリックしてください！",
     "description": "ボタンのテキスト"
   },
-  "changeBackground": {
-    "message": "背景を変更",
-    "description": "ページの背景を変更するボタン"
-  },
   "loadingSettings": {
     "message": "設定を読み込み中...",
     "description": "読み込み状態のメッセージ"
@@ -38,14 +30,6 @@
   "settings": {
     "message": "設定",
     "description": "設定セクションのタイトル"
-  },
-  "favoriteColor": {
-    "message": "好きな色",
-    "description": "好きな色の設定ラベル"
-  },
-  "favoriteColorDescription": {
-    "message": "拡張機能の操作で使うアクセントカラーを選択します。",
-    "description": "好きな色のセレクト用補助テキスト"
   },
   "colorRed": {
     "message": "赤",
@@ -71,25 +55,9 @@
     "message": "オレンジ",
     "description": "色のオプション：オレンジ"
   },
-  "likesColor": {
-    "message": "色が好きです",
-    "description": "色の好みのトグル"
-  },
-  "save": {
-    "message": "保存",
-    "description": "保存ボタン"
-  },
   "cancel": {
     "message": "キャンセル",
     "description": "キャンセルボタン"
-  },
-  "saved": {
-    "message": "保存しました！",
-    "description": "保存成功メッセージ"
-  },
-  "error": {
-    "message": "エラー",
-    "description": "エラーメッセージのプレフィックス"
   },
   "failedToLoad": {
     "message": "設定の読み込みに失敗しました",
@@ -136,5 +104,77 @@
   "openPopup": {
     "message": "拡張機能ポップアップを開く",
     "description": "拡張機能アクションのデフォルトタイトル"
+  },
+  "transportTitle": {
+    "message": "トランスポート — 拡張機能内 WebRTC"
+  },
+  "transportDescription": {
+    "message": "ホストとクライアント間で実際の LAN / tailnet 経路を使った手動の offer / answer セットアップ。Phase 2 トランスポートゲート。"
+  },
+  "transportState": {
+    "message": "状態"
+  },
+  "transportRole": {
+    "message": "役割"
+  },
+  "transportError": {
+    "message": "エラー"
+  },
+  "transportLocalDescriptor": {
+    "message": "ローカル記述子"
+  },
+  "transportRemoteDescriptor": {
+    "message": "リモート記述子 (相手から貼り付け)"
+  },
+  "transportStartHost": {
+    "message": "ホスト開始 (offer を作成)"
+  },
+  "transportStartClient": {
+    "message": "クライアント開始 (offer を受諾)"
+  },
+  "transportApplyAnswer": {
+    "message": "リモート answer を適用"
+  },
+  "transportDisconnect": {
+    "message": "切断"
+  },
+  "transportStatus": {
+    "message": "トランスポート状態"
+  },
+  "transportStatusDescription": {
+    "message": "拡張機能内 WebRTC トランスポートの状態。Phase 2 トランスポートゲート。"
+  },
+  "loading": {
+    "message": "読み込み中..."
+  },
+  "requestTitle": {
+    "message": "現在のリクエスト"
+  },
+  "requestState": {
+    "message": "状態"
+  },
+  "requestOutcome": {
+    "message": "結果"
+  },
+  "requestNoController": {
+    "message": "アプリケーション コントローラはまだ実装されていません。Phase 4 では applicationKey=\"unspecified\" は REQUEST_NOT_SUPPORTED のまま、Phase 6/7/8 が対応する契約を実装するまで保留されます。"
+  },
+  "syncAuth": {
+    "message": "sync auth"
+  },
+  "cancelRequest": {
+    "message": "キャンセル"
+  },
+  "roleTitle": {
+    "message": "ローカル ロール (端末ローカル)"
+  },
+  "roleDescription": {
+    "message": "chrome.storage.local に保存されます。端末間で同期されることはありません。"
+  },
+  "roleHost": {
+    "message": "ホスト"
+  },
+  "roleClient": {
+    "message": "クライアント"
   }
 }

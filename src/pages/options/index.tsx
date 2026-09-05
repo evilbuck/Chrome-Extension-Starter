@@ -1,237 +1,386 @@
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Badge } from '@/components/tailgrids/core/badge';
-import { Button } from '@/components/tailgrids/core/button';
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardFooter,
-    CardHeader,
-    CardTitle
-} from '@/components/tailgrids/core/card';
-import {
-    Select,
-    SelectContent,
-    SelectDescription,
-    SelectIndicator,
-    SelectItem,
-    SelectLabel,
-    SelectTrigger,
-    SelectValue
-} from '@/components/tailgrids/core/select';
-import { TabContent, TabList, TabRoot, TabTrigger } from '@/components/tailgrids/core/tabs';
-import { Toggle } from '@/components/tailgrids/core/toggle';
-import { type Settings, settingsManager } from '@/shared/config';
+    MSG,
+    type Lifecycle,
+    type RequestOutcome,
+    type RequestState,
+    type Role
+} from '@/shared/constants';
 import { t } from '@/shared/lib/i18n';
 import { logger } from '@/shared/lib/logger';
+import { kv } from '@/shared/lib/storage';
 
-// Import styles
 import '@/shared/styles.css';
 
-type SaveStatus = 'idle' | 'success' | 'error';
+interface TransportStatus {
+    state: Lifecycle;
+    role: Role | null;
+    connectionId: string | null;
+    localDescriptor: string | null;
+    error: string | null;
+}
 
-type OptionsBadgeColor = 'error' | 'success' | 'blue' | 'warning' | 'purple' | 'orange';
+interface RequestStatusView {
+    requestId: string | null;
+    state: RequestState;
+    outcome: RequestOutcome | null;
+    since: number | null;
+    error: string | null;
+    reason: string | null;
+}
 
-const favoriteColorBadgeMap: Record<string, OptionsBadgeColor> = {
-    red: 'error',
-    green: 'success',
-    blue: 'blue',
-    yellow: 'warning',
-    purple: 'purple',
-    orange: 'orange'
+const initialRequest: RequestStatusView = {
+    requestId: null,
+    state: 'idle',
+    outcome: null,
+    since: null,
+    error: null,
+    reason: null
 };
 
-const favoriteColorOptions = [
-    { id: 'red', label: 'colorRed' },
-    { id: 'green', label: 'colorGreen' },
-    { id: 'blue', label: 'colorBlue' },
-    { id: 'yellow', label: 'colorYellow' },
-    { id: 'purple', label: 'colorPurple' },
-    { id: 'orange', label: 'colorOrange' }
-] as const;
+const TransportPanel = () => {
+    const [status, setStatus] = useState<TransportStatus>({
+        state: 'idle',
+        role: null,
+        connectionId: null,
+        localDescriptor: null,
+        error: null
+    });
+    const [remoteDescriptor, setRemoteDescriptor] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [lastResult, setLastResult] = useState<string>('');
 
-const Options = () => {
-    const [settings, setSettings] = useState<Settings | null>(null);
-    const [status, setStatus] = useState<SaveStatus>('idle');
-    const [loading, setLoading] = useState(true);
+    const refresh = (): void => {
+        chrome.runtime
+            .sendMessage({ type: MSG.OPTIONS_GET_STATUS })
+            .then((res) => {
+                if (res && typeof res === 'object' && 'state' in (res as object)) {
+                    setStatus(res as TransportStatus);
+                }
+            })
+            .catch((err: unknown) => logger.debug('[options] status fetch:', err));
+    };
 
     useEffect(() => {
-        (async () => {
-            try {
-                const loadedSettings = await settingsManager.load();
-                setSettings(loadedSettings);
-            } catch (error) {
-                logger.error('Failed to load settings:', error);
-                setStatus('error');
-            } finally {
-                setLoading(false);
+        refresh();
+        const onEvent = (msg: unknown): void => {
+            if (
+                msg &&
+                typeof msg === 'object' &&
+                (msg as { type?: unknown }).type === MSG.OFFSCREEN_EVENT
+            ) {
+                refresh();
             }
-        })();
+        };
+        chrome.runtime.onMessage.addListener(onEvent);
+        return () => chrome.runtime.onMessage.removeListener(onEvent);
     }, []);
 
-    const saveOptions = async () => {
-        if (!settings) return;
-
+    const startHost = async (): Promise<void> => {
+        setBusy(true);
+        setLastResult('');
         try {
-            await settingsManager.save(settings);
-            setStatus('success');
-            const id = window.setTimeout(() => setStatus('idle'), 1200);
-            void id;
-        } catch (error) {
-            logger.error('Failed to save settings:', error);
-            setStatus('error');
+            const res = await chrome.runtime.sendMessage({ type: MSG.OPTIONS_START_HOST });
+            const r = res as { ok?: boolean; descriptor?: string; error?: string };
+            if (r.ok && r.descriptor) {
+                setStatus((s) => ({ ...s, localDescriptor: r.descriptor as string }));
+                setLastResult(`offer ready (${(r.descriptor as string).length} bytes)`);
+            } else {
+                setLastResult(`error: ${r.error ?? 'unknown'}`);
+            }
+        } finally {
+            setBusy(false);
+            refresh();
         }
     };
 
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-background-soft-50 p-6 text-title-50">
-                <div className="mx-auto flex min-h-full max-w-xl items-center justify-center">
-                    <Card className="border border-base-100 shadow-sm">
-                        <CardContent className="py-10">
-                            <div className="animate-pulse rounded-2xl bg-background-soft-100 px-8 py-10 text-center text-sm text-text-100">
-                                {t('loadingSettings')}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        );
-    }
+    const startClient = async (): Promise<void> => {
+        if (!remoteDescriptor) return;
+        setBusy(true);
+        setLastResult('');
+        try {
+            const res = await chrome.runtime.sendMessage({
+                type: MSG.OPTIONS_START_CLIENT,
+                payload: { remoteDescriptor }
+            });
+            const r = res as { ok?: boolean; descriptor?: string; error?: string };
+            if (r.ok && r.descriptor) {
+                setStatus((s) => ({ ...s, localDescriptor: r.descriptor as string }));
+                setLastResult(`answer ready (${(r.descriptor as string).length} bytes)`);
+            } else {
+                setLastResult(`error: ${r.error ?? 'unknown'}`);
+            }
+        } finally {
+            setBusy(false);
+            refresh();
+        }
+    };
 
-    if (!settings) {
-        return (
-            <div className="min-h-screen bg-background-soft-50 p-6 text-title-50">
-                <div className="mx-auto flex min-h-full max-w-xl items-center justify-center">
-                    <Card className="border border-alert-danger-border bg-alert-danger-background shadow-sm">
-                        <CardContent className="py-10 text-center">
-                            <Badge color="error" size="md">
-                                {t('failedToLoad')}
-                            </Badge>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-        );
-    }
+    const applyAnswer = async (): Promise<void> => {
+        if (!remoteDescriptor) return;
+        setBusy(true);
+        setLastResult('');
+        try {
+            const res = await chrome.runtime.sendMessage({
+                type: MSG.OPTIONS_APPLY_ANSWER,
+                payload: { remoteDescriptor }
+            });
+            const r = res as { ok?: boolean; error?: string };
+            setLastResult(r.ok ? 'answer applied' : `error: ${r.error ?? 'unknown'}`);
+            if (r.ok) setRemoteDescriptor('');
+        } finally {
+            setBusy(false);
+            refresh();
+        }
+    };
 
-    const favoriteColor = settings.favoriteColor;
-    const favoriteColorLabel =
-        favoriteColorOptions.find((option) => option.id === favoriteColor)?.label ?? favoriteColorOptions[0].label;
+    const sendEcho = async (): Promise<void> => {
+        setBusy(true);
+        setLastResult('');
+        try {
+            const res = await chrome.runtime.sendMessage({
+                type: MSG.OPTIONS_SEND_SYNTHETIC,
+                payload: { payloadKind: 'echo', text: 'hello from options', deadlineMs: 5000 }
+            });
+            const r = res as { ok?: boolean; requestId?: string; error?: string };
+            setLastResult(r.ok ? `sent ${r.requestId}` : `error: ${r.error ?? 'unknown'}`);
+        } finally {
+            setBusy(false);
+            refresh();
+        }
+    };
+
+    const disconnect = async (): Promise<void> => {
+        setBusy(true);
+        setLastResult('');
+        try {
+            await chrome.runtime.sendMessage({ type: MSG.OPTIONS_DISCONNECT });
+            setLastResult('disconnected');
+        } finally {
+            setBusy(false);
+            refresh();
+        }
+    };
 
     return (
-        <div className="min-h-screen bg-background-soft-50 p-6 text-title-50">
-            <div className="mx-auto flex min-h-full max-w-2xl items-center justify-center">
-                <Card className="border border-base-100 shadow-md">
-                    <CardHeader className="space-y-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div className="space-y-3">
-                                <Badge color="primary">{t('optionsTitle')}</Badge>
-                                <div>
-                                    <CardTitle>{t('optionsTitle')}</CardTitle>
-                                    <CardDescription className="mt-2 text-sm">
-                                        {t('optionsDescription')}
-                                    </CardDescription>
-                                </div>
-                            </div>
+        <section>
+            <h2>{t('transportTitle', 'Transport')}</h2>
+            <ul>
+                <li>
+                    <strong>{t('transportState', 'State')}: </strong>
+                    <span data-testid="transport-state">{status.state}</span>
+                </li>
+                <li>
+                    <strong>{t('transportRole', 'Role')}: </strong>
+                    {status.role ?? '—'}
+                </li>
+                <li>
+                    <strong>{t('connectionId', 'Connection ID')}: </strong>
+                    {status.connectionId ?? '—'}
+                </li>
+                {status.error && (
+                    <li>
+                        <strong>{t('transportError', 'Error')}: </strong>
+                        {status.error}
+                    </li>
+                )}
+            </ul>
 
-                            {status !== 'idle' && (
-                                <Badge color={status === 'success' ? 'success' : 'error'} size="md">
-                                    {status === 'success' ? t('saved') : t('failedToSave')}
-                                </Badge>
-                            )}
-                        </div>
-                    </CardHeader>
+            {status.localDescriptor && (
+                <div>
+                    <h3>{t('transportLocalDescriptor', 'Local descriptor')}</h3>
+                    <textarea readOnly value={status.localDescriptor} rows={6} data-testid="local-descriptor" />
+                </div>
+            )}
 
-                    <CardContent className="pb-2">
-                        <TabRoot defaultValue="appearance" className="overflow-visible bg-card-background-50 shadow-sm">
-                            <TabList>
-                                <TabTrigger value="appearance" badge={1}>
-                                    {t('appearanceTab')}
-                                </TabTrigger>
-                                <TabTrigger value="behavior" badge={1}>
-                                    {t('behaviorTab')}
-                                </TabTrigger>
-                            </TabList>
+            <h3>{t('manualSignaling', 'Manual signaling')}</h3>
+            <textarea
+                value={remoteDescriptor}
+                onInput={(e: Event) =>
+                    setRemoteDescriptor((e.currentTarget as HTMLTextAreaElement).value)
+                }
+                placeholder={t('transportRemoteDescriptor', 'Remote descriptor (paste from peer)')}
+                rows={6}
+                data-testid="remote-descriptor"
+            />
 
-                            <TabContent value="appearance" className="space-y-4">
-                                <div className="flex items-center justify-between gap-3 rounded-2xl border border-base-100 bg-background-soft-50 p-4">
-                                    <div>
-                                        <div className="text-sm font-medium text-input-label-text">
-                                            {t('favoriteColor')}
-                                        </div>
-                                        <div className="mt-1 text-sm text-text-100">
-                                            {t('favoriteColorDescription')}
-                                        </div>
-                                    </div>
-
-                                    <Badge
-                                        color={favoriteColorBadgeMap[favoriteColor] ?? 'primary'}
-                                        size="md"
-                                        className="capitalize">
-                                        {t(`color${favoriteColor.charAt(0).toUpperCase() + favoriteColor.slice(1)}`)}
-                                    </Badge>
-                                </div>
-
-                                <Select
-                                    value={favoriteColor}
-                                    onChange={(value) => setSettings({ ...settings, favoriteColor: value })}>
-                                    <SelectLabel>{t('favoriteColor')}</SelectLabel>
-                                    <SelectDescription>{t('favoriteColorDescription')}</SelectDescription>
-                                    <SelectTrigger>
-                                        <SelectValue>{t(favoriteColorLabel)}</SelectValue>
-                                        <SelectIndicator />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {favoriteColorOptions.map((option) => (
-                                            <SelectItem key={option.id} id={option.id} textValue={t(option.label)}>
-                                                {t(option.label)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </TabContent>
-
-                            <TabContent value="behavior" className="space-y-4">
-                                <div className="rounded-2xl border border-base-100 bg-background-soft-50 p-5">
-                                    <div className="flex flex-wrap items-center justify-between gap-4">
-                                        <div>
-                                            <div className="text-sm font-medium text-input-label-text">
-                                                {t('likesColor')}
-                                            </div>
-                                            <div className="mt-1 text-sm text-text-100">
-                                                {t('likesColorDescription')}
-                                            </div>
-                                        </div>
-
-                                        <Toggle
-                                            size="md"
-                                            checked={settings.likesColor}
-                                            onChange={(event) =>
-                                                setSettings({
-                                                    ...settings,
-                                                    likesColor: event.currentTarget.checked
-                                                })
-                                            }
-                                            label={settings.likesColor ? t('enabled') : t('disabled')}
-                                        />
-                                    </div>
-                                </div>
-                            </TabContent>
-                        </TabRoot>
-                    </CardContent>
-
-                    <CardFooter className="flex items-center justify-end gap-3 pt-2">
-                        <Button type="button" onClick={saveOptions}>
-                            {t('save')}
-                        </Button>
-                    </CardFooter>
-                </Card>
+            <div>
+                <button type="button" disabled={busy} onClick={startHost} data-testid="start-host">
+                    {t('transportStartHost', 'Start host')}
+                </button>
+                <button type="button" disabled={busy || !remoteDescriptor} onClick={startClient} data-testid="start-client">
+                    {t('transportStartClient', 'Start client')}
+                </button>
+                <button type="button" disabled={busy || !remoteDescriptor} onClick={applyAnswer} data-testid="apply-answer">
+                    {t('transportApplyAnswer', 'Apply answer')}
+                </button>
+                <button
+                    type="button"
+                    disabled={busy || status.state !== 'connected'}
+                    onClick={sendEcho}
+                    data-testid="send-echo"
+                >
+                    {t('transportSendEcho', 'Send echo')}
+                </button>
+                <button type="button" disabled={busy} onClick={disconnect} data-testid="disconnect">
+                    {t('transportDisconnect', 'Disconnect')}
+                </button>
             </div>
-        </div>
+
+            {lastResult && <p data-testid="last-result">{lastResult}</p>}
+        </section>
     );
 };
+
+const RequestPanel = () => {
+    const [status, setStatus] = useState<RequestStatusView>(initialRequest);
+    const [busy, setBusy] = useState(false);
+
+    const refresh = (): void => {
+        chrome.runtime
+            .sendMessage({ type: MSG.REQUEST_STATUS })
+            .then((res) => {
+                if (res && typeof res === 'object' && 'state' in (res as object)) {
+                    setStatus(res as RequestStatusView);
+                }
+            })
+            .catch((err: unknown) => logger.debug('[options] request status:', err));
+    };
+
+    useEffect(() => {
+        refresh();
+    }, []);
+
+    const start = async (): Promise<void> => {
+        setBusy(true);
+        try {
+            const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+            const tab = tabs[0];
+            if (!tab || tab.id === undefined) return;
+            const origin = (tab.url ?? '').trim();
+            const allowedReturnOrigins = origin ? [new URL(origin).origin] : [];
+            await chrome.runtime.sendMessage({
+                type: MSG.REQUEST_START,
+                payload: {
+                    applicationKey: 'unspecified',
+                    intendedAccount: 'unspecified',
+                    intendedOriginTab: tab.id,
+                    allowedReturnOrigins
+                }
+            });
+        } finally {
+            setBusy(false);
+            refresh();
+        }
+    };
+
+    const cancel = async (): Promise<void> => {
+        setBusy(true);
+        try {
+            await chrome.runtime.sendMessage({ type: MSG.REQUEST_CANCEL });
+        } finally {
+            setBusy(false);
+            refresh();
+        }
+    };
+
+    return (
+        <section>
+            <h2>{t('requestTitle', 'Current request')}</h2>
+            <ul>
+                <li>
+                    <strong>{t('requestState', 'State')}: </strong>
+                    <span data-testid="request-state">{status.state}</span>
+                </li>
+                {status.outcome && (
+                    <li>
+                        <strong>{t('requestOutcome', 'Outcome')}: </strong>
+                        {status.outcome}
+                        {status.reason ? ` (${status.reason})` : ''}
+                    </li>
+                )}
+                {status.error && (
+                    <li>
+                        <strong>{t('transportError', 'Error')}: </strong>
+                        {status.error}
+                    </li>
+                )}
+            </ul>
+            <div>
+                <button type="button" disabled={busy} onClick={start} data-testid="start-request">
+                    {t('syncAuth', 'sync auth')}
+                </button>
+                <button type="button" disabled={busy || !status.requestId} onClick={cancel} data-testid="cancel-request">
+                    {t('cancelRequest', 'Cancel')}
+                </button>
+            </div>
+            <p>
+                <em>
+                    {t(
+                        'requestNoController',
+                        'Application controllers are not yet implemented. Phase 4 leaves applicationKey="unspecified" in REQUEST_NOT_SUPPORTED until Phase 6/7/8 ships a supported contract.'
+                    )}
+                </em>
+            </p>
+        </section>
+    );
+};
+
+const RoleConfigCard = () => {
+    const [role, setRole] = useState<'host' | 'client' | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    useEffect(() => {
+        kv.get('local', 'role', null as 'host' | 'client' | null)
+            .then(setRole)
+            .catch((err: unknown) => logger.error('[options] role load:', err));
+    }, []);
+
+    const save = async (next: 'host' | 'client'): Promise<void> => {
+        setBusy(true);
+        try {
+            try {
+                await kv.set('local', 'role', next);
+                setRole(next);
+            } catch (err: unknown) {
+                logger.error('[options] role save failed (visible):', err);
+                throw err;
+            }
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <section>
+            <h2>{t('roleTitle', 'Local role (machine-local)')}</h2>
+            <p>
+                {t(
+                    'roleDescription',
+                    'This setting is stored in chrome.storage.local. It never syncs across machines and is reset if you uninstall the extension.'
+                )}
+            </p>
+            <div>
+                <button type="button" disabled={busy || role === 'host'} onClick={() => void save('host')}>
+                    {t('roleHost', 'Host')}
+                </button>
+                <button type="button" disabled={busy || role === 'client'} onClick={() => void save('client')}>
+                    {t('roleClient', 'Client')}
+                </button>
+            </div>
+            <p data-testid="local-role">{role ?? '—'}</p>
+        </section>
+    );
+};
+
+const Options = () => (
+    <main className="min-w-[48rem] p-6">
+        <TransportPanel />
+        <RequestPanel />
+        <RoleConfigCard />
+    </main>
+);
 
 const root = document.getElementById('root');
 if (root) render(<Options />, root);

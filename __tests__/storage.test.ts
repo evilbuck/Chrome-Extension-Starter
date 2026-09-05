@@ -1,49 +1,65 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTypedStorage } from '@/shared/lib/storage';
 
-// Mock chrome.storage API
-const mockStorageAreas = {
-    local: {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn()
-    },
-    sync: {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn()
-    },
-    managed: {
-        get: vi.fn()
-    },
-    session: {
-        get: vi.fn(),
-        set: vi.fn(),
-        remove: vi.fn()
-    }
+// Phase 4: local + session only. Sync and managed areas were removed
+// because Phase 4 settings must stay machine-local.
+
+interface MockedBucket {
+    get: ReturnType<typeof vi.fn>;
+    set: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
+}
+
+const mockStorageAreas: { local: MockedBucket; session: MockedBucket } = {
+    local: { get: vi.fn(), set: vi.fn(), remove: vi.fn() },
+    session: { get: vi.fn(), set: vi.fn(), remove: vi.fn() }
 };
 
-global.chrome = {
+(global as { chrome: typeof chrome }).chrome = {
     storage: mockStorageAreas
-} as any;
+} as unknown as typeof chrome;
 
-// Test schema
 interface TestSchema {
     local: {
-        theme: string;
-        count: number;
-    };
-    sync: {
-        username: string;
-        enabled: boolean;
-    };
-    managed: {
-        policy: string;
+        role: 'host' | 'client' | null;
+        connectionMetadata: { connectionId: string | null; lastConnectedAt: number | null };
     };
     session: {
-        token: string | null;
+        activeRequestId: string | null;
+        activeRequestOriginTab: number | null;
     };
 }
+
+/**
+ * Chrome's storage API semantics we mimic in the mock:
+ *   - `bucket.get([key], cb)` returns only the requested keys' stored values.
+ *   - `bucket.get({key: default}, cb)` returns the stored value if present,
+ *     otherwise the supplied default.
+ *   - `bucket.get(null, cb)` returns every stored key/value.
+ *   - `bucket.getAll(defaults)` (used as `getAll`) is the union of stored
+ *     keys and defaults.
+ */
+const chromeGetImpl = (
+    defaults: Record<string, unknown> | string[] | null,
+    stored: Record<string, unknown>,
+    cb: (v: Record<string, unknown>) => void
+): void => {
+    if (defaults === null) {
+        cb(stored);
+        return;
+    }
+    if (Array.isArray(defaults)) {
+        const out: Record<string, unknown> = {};
+        for (const k of defaults) {
+            if (k in stored) out[k] = stored[k];
+        }
+        cb(out);
+        return;
+    }
+    const out: Record<string, unknown> = { ...defaults };
+    for (const k of Object.keys(stored)) out[k] = stored[k];
+    cb(out);
+};
 
 describe('createTypedStorage', () => {
     let kv: ReturnType<typeof createTypedStorage<TestSchema>>;
@@ -54,172 +70,72 @@ describe('createTypedStorage', () => {
     });
 
     describe('get()', () => {
-        it('should get value from local storage with fallback', async () => {
-            mockStorageAreas.local.get.mockImplementation((_keys, callback) => {
-                callback({ theme: 'dark' });
-            });
-
-            const result = await kv.get('local', 'theme', 'light');
-
-            expect(result).toBe('dark');
-            expect(mockStorageAreas.local.get).toHaveBeenCalled();
+        it('returns the value when present', async () => {
+            mockStorageAreas.local.get.mockImplementation((_d, cb) => chromeGetImpl(_d, { role: 'host' }, cb));
+            await expect(kv.get('local', 'role', null as 'host' | 'client' | null)).resolves.toBe('host');
         });
 
-        it('should return fallback if value does not exist', async () => {
-            mockStorageAreas.local.get.mockImplementation((keys, callback) => {
-                // Return the fallback value when key doesn't exist
-                const keysObj = typeof keys === 'string' ? { [keys]: 'light' } : keys;
-                callback(keysObj || {});
-            });
-
-            const result = await kv.get('local', 'theme', 'light');
-
-            // Since our mock returns the passed fallback, it should be 'light'
-            expect(result).toBeDefined();
+        it('returns the fallback when absent', async () => {
+            mockStorageAreas.local.get.mockImplementation((_d, cb) => chromeGetImpl(_d, {}, cb));
+            await expect(kv.get('local', 'role', null as 'host' | 'client' | null)).resolves.toBeNull();
         });
 
-        it('should get value from sync storage', async () => {
-            mockStorageAreas.sync.get.mockImplementation((_keys, callback) => {
-                callback({ username: 'testuser' });
-            });
-
-            const result = await kv.get('sync', 'username');
-
-            expect(result).toBe('testuser');
-        });
-
-        it('should get value from managed storage (read-only)', async () => {
-            mockStorageAreas.managed.get.mockImplementation((_keys, callback) => {
-                callback({ policy: 'strict' });
-            });
-
-            const result = await kv.get('managed', 'policy', 'default');
-
-            expect(result).toBe('strict');
-        });
-
-        it('should get value from session storage', async () => {
-            mockStorageAreas.session.get.mockImplementation((_keys, callback) => {
-                callback({ token: 'abc123' });
-            });
-
-            const result = await kv.get('session', 'token');
-
-            expect(result).toBe('abc123');
+        it('returns undefined when no fallback and absent', async () => {
+            mockStorageAreas.local.get.mockImplementation((_d, cb) => chromeGetImpl(_d, {}, cb));
+            await expect(kv.get('local', 'connectionMetadata')).resolves.toBeUndefined();
         });
     });
 
     describe('getAll()', () => {
-        it('should get all items from storage with defaults', async () => {
-            mockStorageAreas.local.get.mockImplementation((defaults, callback) => {
-                // Merge stored data with defaults
-                const stored = { theme: 'dark' };
-                callback({ ...defaults, ...stored });
+        it('returns full shape with defaults', async () => {
+            mockStorageAreas.local.get.mockImplementation((_d, cb) => chromeGetImpl(_d, { role: 'host' }, cb));
+            const result = await kv.getAll('local', {
+                role: null as 'host' | 'client' | null,
+                connectionMetadata: { connectionId: null, lastConnectedAt: null }
             });
-
-            const result = await kv.getAll('local', { theme: 'light', count: 0 });
-
-            expect(result).toHaveProperty('theme', 'dark');
-            expect(result).toHaveProperty('count', 0);
-        });
-
-        it('should get all items without defaults', async () => {
-            mockStorageAreas.sync.get.mockImplementation((_keys, callback) => {
-                callback({ username: 'testuser' });
-            });
-
-            const result = await kv.getAll('sync');
-
-            expect(result).toEqual({ username: 'testuser' });
+            expect(result.role).toBe('host');
+            expect(result.connectionMetadata).toEqual({ connectionId: null, lastConnectedAt: null });
         });
     });
 
     describe('set()', () => {
-        it('should set value in local storage', async () => {
-            mockStorageAreas.local.set.mockImplementation((_items, callback) => {
-                callback?.();
-            });
-
-            await kv.set('local', 'theme', 'dark');
-
-            expect(mockStorageAreas.local.set).toHaveBeenCalledWith({ theme: 'dark' }, expect.any(Function));
-        });
-
-        it('should set value in sync storage', async () => {
-            mockStorageAreas.sync.set.mockImplementation((_items, callback) => {
-                callback?.();
-            });
-
-            await kv.set('sync', 'username', 'newuser');
-
-            expect(mockStorageAreas.sync.set).toHaveBeenCalledWith({ username: 'newuser' }, expect.any(Function));
-        });
-
-        it('should set value in session storage', async () => {
-            mockStorageAreas.session.set.mockImplementation((_items, callback) => {
-                callback?.();
-            });
-
-            await kv.set('session', 'token', 'xyz789');
-
-            expect(mockStorageAreas.session.set).toHaveBeenCalledWith({ token: 'xyz789' }, expect.any(Function));
+        it('writes the value', async () => {
+            mockStorageAreas.local.set.mockImplementation((_items, cb) => cb());
+            await kv.set('local', 'role', 'client');
+            expect(mockStorageAreas.local.set).toHaveBeenCalledWith({ role: 'client' }, expect.any(Function));
         });
     });
 
     describe('setAll()', () => {
-        it('should set multiple items in local storage', async () => {
-            mockStorageAreas.local.set.mockImplementation((_items, callback) => {
-                callback?.();
-            });
+        it('writes multiple values', async () => {
+            mockStorageAreas.local.set.mockImplementation((_items, cb) => cb());
+            await kv.setAll('local', { role: 'host' });
+            expect(mockStorageAreas.local.set).toHaveBeenCalled();
+        });
+    });
 
-            await kv.setAll('local', { theme: 'dark', count: 10 });
-
-            expect(mockStorageAreas.local.set).toHaveBeenCalledWith({ theme: 'dark', count: 10 }, expect.any(Function));
+    describe('remove()', () => {
+        it('removes a single key', async () => {
+            mockStorageAreas.local.remove.mockImplementation((_keys, cb) => cb());
+            await kv.remove('local', 'role');
+            expect(mockStorageAreas.local.remove).toHaveBeenCalledWith(['role'], expect.any(Function));
         });
 
-        it('should set multiple items in sync storage', async () => {
-            mockStorageAreas.sync.set.mockImplementation((_items, callback) => {
-                callback?.();
-            });
-
-            await kv.setAll('sync', { username: 'admin', enabled: true });
-
-            expect(mockStorageAreas.sync.set).toHaveBeenCalledWith(
-                { username: 'admin', enabled: true },
+        it('removes multiple keys', async () => {
+            mockStorageAreas.local.remove.mockImplementation((_keys, cb) => cb());
+            await kv.remove('local', ['role', 'connectionMetadata']);
+            expect(mockStorageAreas.local.remove).toHaveBeenCalledWith(
+                ['role', 'connectionMetadata'],
                 expect.any(Function)
             );
         });
     });
 
-    describe('remove()', () => {
-        it('should remove single key from local storage', async () => {
-            mockStorageAreas.local.remove.mockImplementation((_keys, callback) => {
-                callback?.();
-            });
-
-            await kv.remove('local', 'theme');
-
-            expect(mockStorageAreas.local.remove).toHaveBeenCalledWith(['theme'], expect.any(Function));
-        });
-
-        it('should remove multiple keys from sync storage', async () => {
-            mockStorageAreas.sync.remove.mockImplementation((_keys, callback) => {
-                callback?.();
-            });
-
-            await kv.remove('sync', ['username', 'enabled']);
-
-            expect(mockStorageAreas.sync.remove).toHaveBeenCalledWith(['username', 'enabled'], expect.any(Function));
-        });
-
-        it('should remove key from session storage', async () => {
-            mockStorageAreas.session.remove.mockImplementation((_keys, callback) => {
-                callback?.();
-            });
-
-            await kv.remove('session', 'token');
-
-            expect(mockStorageAreas.session.remove).toHaveBeenCalledWith(['token'], expect.any(Function));
+    describe('local-only contract', () => {
+        it('writes only to chrome.storage.local', async () => {
+            mockStorageAreas.local.set.mockImplementation((_items, cb) => cb());
+            await kv.set('local', 'role', 'host');
+            expect(mockStorageAreas.local.set).toHaveBeenCalled();
         });
     });
 });

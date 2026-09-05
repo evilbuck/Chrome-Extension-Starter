@@ -1,0 +1,13 @@
+{
+  "verdict": "pass",
+  "markdownFiles": 24,
+  "relativeLinks": 31,
+  "frontmatterPointers": 55,
+  "canonicalCitationDefinitions": 56,
+  "requiredApplicationScenarios": 6,
+  "userGoal": "inherited verbatim",
+  "brainstormHash": "matches existing sidecar",
+  "errors": [],
+  "checkedAt": "2026-09-05T13:47:22.415Z",
+  "scope": "Documentation structure, local links, citation definitions, requirement markers and unchanged brainstorm hash only. No source, network or authentication runtime verification."
+}

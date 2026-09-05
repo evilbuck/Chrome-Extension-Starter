@@ -1,21 +1,15 @@
+// Phase 4 error helpers. The `details` field is intentionally absent:
+// Phase 2 evidence discipline forbids echoing SDP, ICE candidates, or
+// credential content in error responses. The `code` is the only structured
+// metadata; the `message` is non-secret.
+
 import type { ErrorResponse } from '@/shared/types';
 
-/**
- * Create a structured error response
- */
-export const createErrorResponse = (message: string, code?: string, details?: unknown): ErrorResponse => {
-    return {
-        error: {
-            message,
-            code,
-            details
-        }
-    };
+export const createErrorResponse = (message: string, code?: string): ErrorResponse => {
+    const err: ErrorResponse['error'] = code !== undefined ? { message, code } : { message };
+    return { error: err };
 };
 
-/**
- * Type guard to check if response is an error
- */
 export const isErrorResponse = (response: unknown): response is ErrorResponse => {
     return (
         typeof response === 'object' &&
@@ -26,17 +20,12 @@ export const isErrorResponse = (response: unknown): response is ErrorResponse =>
     );
 };
 
-/**
- * Convert any error to structured error response
- */
 export const toErrorResponse = (error: unknown): ErrorResponse => {
     if (isErrorResponse(error)) {
         return error;
     }
-
     if (error instanceof Error) {
-        return createErrorResponse(error.message, error.name, { stack: error.stack });
+        return createErrorResponse(error.message, error.name);
     }
-
     return createErrorResponse(String(error), 'UNKNOWN_ERROR');
 };

@@ -62,13 +62,9 @@ export default defineConfig({
             plugins: [pluginPreact(), pluginTypeCheck()],
             source: {
                 entry: {
-                    // Each entry becomes js/[name].js after build
                     popup: './src/pages/popup/index.tsx',
                     options: './src/pages/options/index.tsx',
-                    content: {
-                        import: './src/content/index.tsx',
-                        html: false // No HTML for content script
-                    }
+                    offscreen: './src/offscreen/index.ts'
                 }
             },
             html: {
@@ -76,6 +72,7 @@ export default defineConfig({
                 template: ({ entryName }) => {
                     if (entryName === 'popup') return 'public/popup.html';
                     if (entryName === 'options') return 'public/options.html';
+                    if (entryName === 'offscreen') return 'public/offscreen.html';
                     // Return undefined for entries that shouldn't emit HTML
                     return undefined;
                 },

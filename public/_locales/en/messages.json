@@ -15,10 +15,6 @@
     "message": "Extension Options",
     "description": "Options page title"
   },
-  "currentURL": {
-    "message": "Current URL",
-    "description": "Label for current URL"
-  },
   "clickCount": {
     "message": "Click count",
     "description": "Label for click counter"
@@ -27,10 +23,6 @@
     "message": "Click me!",
     "description": "Button text"
   },
-  "changeBackground": {
-    "message": "Change Background",
-    "description": "Button to change page background"
-  },
   "loadingSettings": {
     "message": "Loading settings...",
     "description": "Loading state message"
@@ -38,14 +30,6 @@
   "settings": {
     "message": "Settings",
     "description": "Settings section title"
-  },
-  "favoriteColor": {
-    "message": "Favorite Color",
-    "description": "Favorite color setting label"
-  },
-  "favoriteColorDescription": {
-    "message": "Choose the accent color used by extension actions.",
-    "description": "Helper text for the favorite color select"
   },
   "colorRed": {
     "message": "Red",
@@ -71,25 +55,9 @@
     "message": "Orange",
     "description": "Color option: orange"
   },
-  "likesColor": {
-    "message": "I like colors",
-    "description": "Toggle for color preference"
-  },
-  "save": {
-    "message": "Save",
-    "description": "Save button"
-  },
   "cancel": {
     "message": "Cancel",
     "description": "Cancel button"
-  },
-  "saved": {
-    "message": "Saved!",
-    "description": "Save success message"
-  },
-  "error": {
-    "message": "Error",
-    "description": "Error message prefix"
   },
   "failedToLoad": {
     "message": "Failed to load settings",
@@ -136,5 +104,77 @@
   "openPopup": {
     "message": "Open Extension Popup",
     "description": "Default title for extension action"
+  },
+  "transportTitle": {
+    "message": "Transport — extension-only WebRTC"
+  },
+  "transportDescription": {
+    "message": "Manual offer/answer setup between host and client over the real LAN/tailnet route. Phase 2 transport gate."
+  },
+  "transportState": {
+    "message": "State"
+  },
+  "transportRole": {
+    "message": "Role"
+  },
+  "transportError": {
+    "message": "Error"
+  },
+  "transportLocalDescriptor": {
+    "message": "Local descriptor"
+  },
+  "transportRemoteDescriptor": {
+    "message": "Remote descriptor (paste from peer)"
+  },
+  "transportStartHost": {
+    "message": "Start host (create offer)"
+  },
+  "transportStartClient": {
+    "message": "Start client (accept offer)"
+  },
+  "transportApplyAnswer": {
+    "message": "Apply remote answer"
+  },
+  "transportDisconnect": {
+    "message": "Disconnect"
+  },
+  "transportStatus": {
+    "message": "Transport status"
+  },
+  "transportStatusDescription": {
+    "message": "State of the extension-only WebRTC transport. Phase 2 transport gate."
+  },
+  "loading": {
+    "message": "Loading..."
+  },
+  "requestTitle": {
+    "message": "Current request"
+  },
+  "requestState": {
+    "message": "State"
+  },
+  "requestOutcome": {
+    "message": "Outcome"
+  },
+  "requestNoController": {
+    "message": "Application controllers are not yet implemented. Phase 4 leaves applicationKey=\"unspecified\" in REQUEST_NOT_SUPPORTED until Phase 6/7/8 ships a supported contract."
+  },
+  "syncAuth": {
+    "message": "sync auth"
+  },
+  "cancelRequest": {
+    "message": "Cancel"
+  },
+  "roleTitle": {
+    "message": "Local role (machine-local)"
+  },
+  "roleDescription": {
+    "message": "Stored in chrome.storage.local. Never syncs across machines."
+  },
+  "roleHost": {
+    "message": "Host"
+  },
+  "roleClient": {
+    "message": "Client"
   }
 }

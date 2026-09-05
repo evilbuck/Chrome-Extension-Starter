@@ -1,0 +1,29 @@
+{
+  "status": "pass",
+  "date": "2026-09-05",
+  "source_plan": "plan-lan-login-handoff.md",
+  "overview": "plan-lan-login-handoff-phases.md",
+  "phase_files": 10,
+  "phase_numbers": "1-10",
+  "backlog_items": 10,
+  "relative_links_checked": 56,
+  "active_queue": "phase-1",
+  "plan_status": "active",
+  "subject_status": "active",
+  "docs_only": true,
+  "checks": [
+    "required phase frontmatter fields",
+    "phase sequence and order",
+    "difficulty and Buck hints",
+    "inherited user goal context",
+    "per-phase execution loops",
+    "overview and index links",
+    "per-phase backlog files",
+    "single active backlog phase",
+    "plan and subject active status",
+    "memory cross-reference",
+    "no stale superseded phase filenames",
+    "no trailing whitespace"
+  ],
+  "deterministic_check_contract": "skipped: all session changes are under .context/; no source/config files changed"
+}
