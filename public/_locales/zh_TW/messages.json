@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Chrome 擴充功能起始模板",
+    "message": "Beam me up",
     "description": "擴充功能名稱"
   },
   "extDescription": {
@@ -137,6 +137,12 @@
   },
   "transportDisconnect": {
     "message": "中斷連線"
+  },
+  "transportSendEcho": {
+    "message": "傳送回音"
+  },
+  "connectionId": {
+    "message": "連線 ID"
   },
   "transportStatus": {
     "message": "傳輸狀態"

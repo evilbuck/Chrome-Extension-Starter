@@ -1,0 +1,10 @@
+{
+  "status": "active",
+  "date": "2026-09-05",
+  "reported": "User cannot send echo on host; client displays ice_failed while testing separate Chrome profiles.",
+  "confirmedFromSource": ["Echo is disabled unless local transport state is connected", "ice_failed is emitted for RTCPeerConnection.connectionState === failed; it does not establish a specific network cause", "Client begins ICE after accepting offer; host must still apply returned answer", "RTC config uses iceServers: [] (host candidates only; no STUN/TURN fallback)"],
+  "evidenceBoundary": "Earlier isolated Chromium two-profile handshake passed; that does not establish the user's current Chrome state or network cause.",
+  "inspectionAttempts": ["User Chrome relay attachment timed out", "Chrome DevTools MCP unavailable: Google Chrome stable executable missing"],
+  "needed": ["Current host transport State", "Whether Apply remote answer succeeded on the host before client failed"],
+  "decision": "Do not enable echo, add STUN/TURN, or change firewall/privacy policy without determining whether signaling completed. No source changes."
+}

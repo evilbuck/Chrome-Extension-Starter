@@ -13,17 +13,17 @@
 
 import {
     ERROR_KIND,
+    type ErrorKind,
     LIFECYCLE,
+    type Lifecycle,
     MSG,
     OFFSCREEN_TARGET,
     PAYLOAD_KIND,
-    type ErrorKind,
-    type Lifecycle,
     type PayloadKind,
     type Role
 } from '@/shared/constants';
 import { logger } from '@/shared/lib/logger';
-import { Peer, PEER_PAYLOAD_KIND, type PeerEnvelope, type PeerPayload } from '@/shared/lib/peer';
+import { PEER_PAYLOAD_KIND, Peer, type PeerEnvelope, type PeerPayload } from '@/shared/lib/peer';
 
 // ---------------------------------------------------------------------------
 // State
@@ -39,9 +39,7 @@ let lastError: ErrorKind | null = null;
 // Helpers
 // ---------------------------------------------------------------------------
 
-const report = (
-    extra?: { peerMessage?: { payloadKind: PayloadKind; text: string; requestId: string } }
-): void => {
+const report = (extra?: { peerMessage?: { payloadKind: PayloadKind; text: string; requestId: string } }): void => {
     const payload = {
         state: lifecycle,
         role,
@@ -129,23 +127,14 @@ const handleInboundPeerMessage = (envelope: PeerEnvelope): void => {
 //
 // The offscreen accepts commands ONLY when the message carries the
 // OFFSCREEN_TARGET marker AND originates from the service worker. The
-// service worker's runtime-sent messages have `sender.url` matching the
-// extension's background page URL. We reject any sender with a tab (popup,
-// options, content script) and any sender whose URL is not the worker URL.
+// worker sender has no tab or document ID. Its URL may be omitted by
+// Chrome; when present, it must match the exact MV3 worker script.
 // ---------------------------------------------------------------------------
 
 const isFromServiceWorker = (sender: chrome.runtime.MessageSender): boolean => {
     if (sender.id !== chrome.runtime.id) return false;
-    if (sender.tab) return false;
-    // The service worker has no document URL; chrome.runtime.sendMessage
-    // from the worker forwards a sender whose url is the worker's
-    // background page URL.
-    const workerUrl = chrome.runtime.getURL('_generated_background_page.html');
-    const acceptable =
-        sender.url === undefined ||
-        sender.url === workerUrl ||
-        sender.url.startsWith('chrome-extension://') && sender.url.includes(chrome.runtime.id);
-    return Boolean(acceptable);
+    if (sender.tab || sender.documentId !== undefined) return false;
+    return sender.url === undefined || sender.url === chrome.runtime.getURL('static/js/background.js');
 };
 
 // ---------------------------------------------------------------------------
@@ -153,11 +142,12 @@ const isFromServiceWorker = (sender: chrome.runtime.MessageSender): boolean => {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (!isFromServiceWorker(sender)) {
-        sendResponse({ ok: false, error: ERROR_KIND.INVALID_SENDER_CONTEXT });
+    // runtime.sendMessage also reaches this document for worker-bound UI
+    // commands. Do not answer those messages: the first response wins.
+    if (!msg || typeof msg !== 'object' || !('target' in msg) || msg.target !== OFFSCREEN_TARGET) {
         return false;
     }
-    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
+    if (Array.isArray(msg)) {
         sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
         return false;
     }
@@ -166,7 +156,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
         return false;
     }
-    if (obj.target !== OFFSCREEN_TARGET) {
+    if (!isFromServiceWorker(sender)) {
         sendResponse({ ok: false, error: ERROR_KIND.INVALID_SENDER_CONTEXT });
         return false;
     }
@@ -288,8 +278,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                     return false;
                 }
                 // Send as a request; resolve on matching reply.
-                peer
-                    .sendRequest(payload, p.deadlineMs)
+                peer.sendRequest(payload, p.deadlineMs)
                     .then(() => {
                         // Resolve the caller immediately; the inbound response
                         // arrives via OFFSCREEN_EVENT.
@@ -333,8 +322,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 const PAYLOAD_KIND_VALUES = Object.values(PAYLOAD_KIND) as string[];
-const isPayloadKind = (v: unknown): v is PayloadKind =>
-    typeof v === 'string' && PAYLOAD_KIND_VALUES.includes(v);
+const isPayloadKind = (v: unknown): v is PayloadKind => typeof v === 'string' && PAYLOAD_KIND_VALUES.includes(v);
 
 const randomNonce = (): string => {
     const c = (globalThis as { crypto?: Crypto }).crypto;

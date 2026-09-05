@@ -1,8 +1,11 @@
+import type { DescriptorEnvelope } from '@/shared/lib/envelope';
+import { parseDescriptorAdopt } from '@/shared/lib/envelope';
+
 // Phase 2 worker-side bridge.
 //
 // Owns the offscreen-document lifecycle (one per profile) and routes
 // OFFSCREEN_* messages between the popup/options UI and the offscreen.
-// Runtime-validates every inbound message sender by URL and contextType.
+// Runtime-validates inbound senders by extension ID and exact document URL.
 // Status queries are answered from the offscreen (the authoritative state
 // owner) — NEVER from worker module-level globals, which would be lost on
 // MV3 worker revival.
@@ -26,14 +29,14 @@
 
 import {
     ERROR_KIND,
+    type ErrorKind,
     LIFECYCLE,
+    type Lifecycle,
     MSG,
     OFFSCREEN_TARGET,
     PAYLOAD_KIND,
-    ROLE,
-    type ErrorKind,
-    type Lifecycle,
     type PayloadKind,
+    ROLE,
     type Role
 } from '@/shared/constants';
 import { logger } from '@/shared/lib/logger';
@@ -51,7 +54,7 @@ const OFFSCREEN_URL = chrome.runtime.getURL('offscreen.html');
  *  any other extension page, content scripts, and external pages. */
 const isAllowedUiPage = (sender: chrome.runtime.MessageSender): boolean => {
     if (sender.id !== chrome.runtime.id) return false;
-    if (sender.tab) return false;
+    // Options opens in a tab; sender.tab does not imply a content script.
     if (typeof sender.url !== 'string' || sender.url.length === 0) return false;
     return sender.url === POPUP_URL || sender.url === OPTIONS_URL;
 };
@@ -105,10 +108,7 @@ const closeOffscreenDocument = async (): Promise<void> => {
 // Send-to-offscreen helper
 // ---------------------------------------------------------------------------
 
-const sendToOffscreen = async <T>(
-    type: MSG,
-    payload?: unknown
-): Promise<T | { ok: false; error: ErrorKind }> => {
+const sendToOffscreen = async <T>(type: MSG, payload?: unknown): Promise<T | { ok: false; error: ErrorKind }> => {
     const ok = await ensureOffscreen();
     if (!ok) return { ok: false, error: ERROR_KIND.CREATE_DOCUMENT_FAILED };
     try {
@@ -131,7 +131,8 @@ const ROLE_VALUES = Object.values(ROLE) as Role[];
 const isLifecycle = (v: unknown): v is Lifecycle => typeof v === 'string' && LIFECYCLE_VALUES.includes(v as Lifecycle);
 const isRole = (v: unknown): v is Role => typeof v === 'string' && ROLE_VALUES.includes(v as Role);
 const isErrorKind = (v: unknown): v is ErrorKind => typeof v === 'string' && ERROR_KIND_VALUES.includes(v as ErrorKind);
-const isPayloadKind = (v: unknown): v is PayloadKind => typeof v === 'string' && PAYLOAD_KIND_VALUES.includes(v as PayloadKind);
+const isPayloadKind = (v: unknown): v is PayloadKind =>
+    typeof v === 'string' && PAYLOAD_KIND_VALUES.includes(v as PayloadKind);
 
 interface OffscreenEventPayload {
     state: Lifecycle;
@@ -242,16 +243,15 @@ const handleStartHost = async (): Promise<unknown> => {
  *   3. Hand the SDP to the offscreen as a single combined init+offer so
  *      it can construct the Peer with the matching connectionId.
  */
-const handleStartClient = async (
-    payload: { remoteDescriptor: unknown }
-): Promise<{ ok: true; descriptor: string } | { ok: false; error: ErrorKind }> => {
+const handleStartClient = async (payload: {
+    remoteDescriptor: unknown;
+}): Promise<{ ok: true; descriptor: string } | { ok: false; error: ErrorKind }> => {
     if (typeof payload.remoteDescriptor !== 'string') {
         return { ok: false, error: ERROR_KIND.MALFORMED };
     }
 
     // Validate the inbound descriptor before any RTC work.
-    const { parseDescriptorAdopt } = await import('@/shared/lib/envelope');
-    let adopted;
+    let adopted: DescriptorEnvelope;
     try {
         adopted = parseDescriptorAdopt(payload.remoteDescriptor, { role: 'host' });
     } catch (err) {
@@ -268,35 +268,33 @@ const handleStartClient = async (
     );
 };
 
-const handleApplyAnswer = async (
-    payload: { remoteDescriptor: unknown }
-): Promise<{ ok: true } | { ok: false; error: ErrorKind }> => {
+const handleApplyAnswer = async (payload: {
+    remoteDescriptor: unknown;
+}): Promise<{ ok: true } | { ok: false; error: ErrorKind }> => {
     if (typeof payload.remoteDescriptor !== 'string') {
         return { ok: false, error: ERROR_KIND.MALFORMED };
     }
-    return sendToOffscreen<{ ok: true } | { ok: false; error: ErrorKind }>(
-        MSG.OFFSCREEN_APPLY_REMOTE,
-        { remoteDescriptor: payload.remoteDescriptor }
-    );
+    return sendToOffscreen<{ ok: true } | { ok: false; error: ErrorKind }>(MSG.OFFSCREEN_APPLY_REMOTE, {
+        remoteDescriptor: payload.remoteDescriptor
+    });
 };
 
-const handleSendSynthetic = async (
-    payload: { payloadKind: unknown; text?: unknown; deadlineMs?: unknown }
-): Promise<{ ok: true; requestId: string } | { ok: false; error: ErrorKind }> => {
+const handleSendSynthetic = async (payload: {
+    payloadKind: unknown;
+    text?: unknown;
+    deadlineMs?: unknown;
+}): Promise<{ ok: true; requestId: string } | { ok: false; error: ErrorKind }> => {
     if (!isPayloadKind(payload.payloadKind)) {
         return { ok: false, error: ERROR_KIND.MALFORMED };
     }
     if (typeof payload.deadlineMs !== 'number' || payload.deadlineMs <= 0) {
         return { ok: false, error: ERROR_KIND.MALFORMED };
     }
-    return sendToOffscreen<{ ok: true; requestId: string } | { ok: false; error: ErrorKind }>(
-        MSG.OFFSCREEN_SEND_PEER,
-        {
-            payloadKind: payload.payloadKind,
-            text: payload.text ?? '',
-            deadlineMs: payload.deadlineMs
-        }
-    );
+    return sendToOffscreen<{ ok: true; requestId: string } | { ok: false; error: ErrorKind }>(MSG.OFFSCREEN_SEND_PEER, {
+        payloadKind: payload.payloadKind,
+        text: payload.text ?? '',
+        deadlineMs: payload.deadlineMs
+    });
 };
 
 // ---------------------------------------------------------------------------

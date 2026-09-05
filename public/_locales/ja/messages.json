@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Chrome拡張機能スターター",
+    "message": "Beam me up",
     "description": "拡張機能名"
   },
   "extDescription": {
@@ -137,6 +137,12 @@
   },
   "transportDisconnect": {
     "message": "切断"
+  },
+  "transportSendEcho": {
+    "message": "エコーを送信"
+  },
+  "connectionId": {
+    "message": "接続 ID"
   },
   "transportStatus": {
     "message": "トランスポート状態"

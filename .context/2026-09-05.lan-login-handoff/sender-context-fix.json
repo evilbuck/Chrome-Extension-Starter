@@ -1,0 +1,12 @@
+{
+  "status": "completed",
+  "date": "2026-09-05",
+  "goal": "Allow the real Options tab to start a host connection without weakening extension sender validation.",
+  "rootCauses": ["Options pages opened in tabs carry sender.tab, incorrectly rejected by the worker's UI allowlist", "Offscreen onMessage answered UI commands addressed to the worker, racing the intended response"],
+  "changes": ["Retain exact same-extension popup/options URL allowlist but permit tab metadata", "Ignore non-offscreen-target messages before offscreen validation", "Accept worker commands only with matching extension ID, no tab or document ID, and absent URL or exact worker-script URL", "Add concrete DescriptorEnvelope annotation to satisfy changed-file lint"],
+  "verification": ["13 routing regressions: 7 failed before fix, all passed after", "Production build with type checking passed", "Full suite: 132 tests passed in 10 files", "Changed-file Biome check passed", "Isolated real Chromium profiles: host offer generated, client answer generated, both connected", "Echo requests resolved successfully in both directions; existing result label reads sent undefined because response omits requestId", "Options reload preserved connected status"],
+  "runtimeNotes": ["A persisted Chromium smoke profile retained the old worker until the extension was explicitly reloaded", "Developer mode must remain enabled when reloading the unpacked extension"],
+  "scope": ["src/background/connection.ts", "src/offscreen/index.ts", "__tests__/connection-routing.test.ts"],
+  "checkContract": "No durable guardrails.json. Ephemeral detector: Vitest; changed-file Biome uses existing project tooling.",
+  "followUp": {"status":"active","issue":"Echo result UI prints sent undefined; send response does not include requestId. Echo round trips succeeded. Separate display-contract issue; unchanged in sender fix."}
+}

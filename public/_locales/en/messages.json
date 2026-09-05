@@ -1,6 +1,6 @@
 {
   "extName": {
-    "message": "Chrome Extension Starter",
+    "message": "Beam me up",
     "description": "Extension name"
   },
   "extDescription": {
@@ -137,6 +137,12 @@
   },
   "transportDisconnect": {
     "message": "Disconnect"
+  },
+  "transportSendEcho": {
+    "message": "Send echo"
+  },
+  "connectionId": {
+    "message": "Connection ID"
   },
   "transportStatus": {
     "message": "Transport status"
