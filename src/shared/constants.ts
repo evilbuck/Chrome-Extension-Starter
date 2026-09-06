@@ -2,7 +2,16 @@
 // and the sync/managed storage area references are removed. The request
 // lifecycle and outcome vocabulary added here drive the control plane.
 
+import type {
+    PairedBrowser,
+    PairingCommand,
+    PairingCommandResult,
+    PairingSnapshot
+} from '@/shared/lib/pairing-protocol';
+
 export const OFFSCREEN_TARGET = 'offscreen-document' as const;
+
+export const PAIRING_TRUST_STORAGE_KEY = 'pairingTrust' as const;
 
 // Transport envelope versions
 export const ENVELOPE_VERSION = 1 as const;
@@ -10,6 +19,7 @@ export const PEER_VERSION = 1 as const;
 
 // Descriptor envelope size cap
 export const DESCRIPTOR_MAX_BYTES = 32 * 1024;
+export const PEER_MAX_BYTES = 96 * 1024;
 
 // Roles
 export const ROLE = {
@@ -88,14 +98,27 @@ export const ERROR_KIND = {
 } as const;
 export type ErrorKind = (typeof ERROR_KIND)[keyof typeof ERROR_KIND];
 
-// Peer payload kinds. Application-specific payloads are a discriminated slot
-// owned by Phase 6/7/8 once the compatibility verdicts move from unresolved.
+// Peer payload kinds. Synthetic echo/ping stay on the existing channel;
+// Slack application variants are typed slots on the same envelope, never
+// generic credential blobs.
 export const PAYLOAD_KIND = {
     ECHO: 'echo',
     PING: 'ping',
-    CANCEL: 'cancel'
+    CANCEL: 'cancel',
+    SLACK_LIST: 'slack_list',
+    SLACK_CAPTURE: 'slack_capture',
+    SLACK_VERIFY: 'slack_verify'
 } as const;
 export type PayloadKind = (typeof PAYLOAD_KIND)[keyof typeof PAYLOAD_KIND];
+
+export const PAYLOAD_RESPONSE_KIND = {
+    ECHO_RESPONSE: 'echo_response',
+    SLACK_SOURCES: 'slack_sources',
+    SLACK_SESSION: 'slack_session',
+    SLACK_VERIFIED: 'slack_verified',
+    SLACK_ERROR: 'slack_error'
+} as const;
+export type PayloadResponseKind = (typeof PAYLOAD_RESPONSE_KIND)[keyof typeof PAYLOAD_RESPONSE_KIND];
 
 // Request timeout budgets (ms). One request deadline pauses only for explicit
 // human interaction; transport timeout is independent and bounded.
@@ -103,52 +126,43 @@ export const REQUEST_DEADLINE_MS = 5 * 60 * 1000;
 export const REQUEST_TRANSPORT_TIMEOUT_MS = 30 * 1000;
 
 export enum MSG {
-    // Phase 2 — offscreen lifecycle. Worker → offscreen.
-    OFFSCREEN_INIT = 'OFFSCREEN_INIT',
-    OFFSCREEN_CONNECT_HOST = 'OFFSCREEN_CONNECT_HOST',
-    OFFSCREEN_CONNECT_CLIENT = 'OFFSCREEN_CONNECT_CLIENT',
-    OFFSCREEN_APPLY_REMOTE = 'OFFSCREEN_APPLY_REMOTE',
+    // Offscreen lifecycle. Worker → offscreen.
     OFFSCREEN_SEND_PEER = 'OFFSCREEN_SEND_PEER',
     OFFSCREEN_CLOSE = 'OFFSCREEN_CLOSE',
     OFFSCREEN_STATUS = 'OFFSCREEN_STATUS',
+    OFFSCREEN_PAIRING = 'OFFSCREEN_PAIRING',
 
-    // Phase 2 — offscreen emits back to worker. Worker fans out to popup/options.
+    // Offscreen emits back to worker. Worker fans out to popup/options.
     OFFSCREEN_EVENT = 'OFFSCREEN_EVENT',
+    OFFSCREEN_PAIRING_STORAGE = 'OFFSCREEN_PAIRING_STORAGE',
 
-    // Phase 2 — popup/options → worker bridge (transport control).
+    // Typed Slack application frames. Worker ↔ offscreen only.
+    OFFSCREEN_APP_REQUEST = 'OFFSCREEN_APP_REQUEST',
+    OFFSCREEN_APP_INBOUND = 'OFFSCREEN_APP_INBOUND',
+
+    // Popup/options → worker bridge (transport control).
     OPTIONS_GET_STATUS = 'OPTIONS_GET_STATUS',
     OPTIONS_DISCONNECT = 'OPTIONS_DISCONNECT',
-    OPTIONS_START_HOST = 'OPTIONS_START_HOST',
-    OPTIONS_START_CLIENT = 'OPTIONS_START_CLIENT',
-    OPTIONS_APPLY_ANSWER = 'OPTIONS_APPLY_ANSWER',
     OPTIONS_SEND_SYNTHETIC = 'OPTIONS_SEND_SYNTHETIC',
+    PAIRING = 'PAIRING',
 
-    // Phase 4 — request control plane. popup/options → worker → offscreen.
+    // Request control plane. popup/options → worker.
     REQUEST_START = 'REQUEST_START',
     REQUEST_CANCEL = 'REQUEST_CANCEL',
-    REQUEST_STATUS = 'REQUEST_STATUS'
+    REQUEST_STATUS = 'REQUEST_STATUS',
+
+    // Slack consent + source listing. popup/options → worker.
+    SLACK_ENABLE = 'SLACK_ENABLE',
+    SLACK_LIST = 'SLACK_LIST'
 }
 
 export const MESSAGE_SPEC = {
-    // Phase 2 offscreen commands
-    [MSG.OFFSCREEN_INIT]: {
-        req: {} as { role: Role; connectionId: string; deadlineMs?: number },
-        res: {} as { ok: true } | { ok: false; error: ErrorKind }
-    },
-    [MSG.OFFSCREEN_CONNECT_HOST]: {
-        req: {} as Record<string, never>,
-        res: {} as { ok: true; descriptor: string } | { ok: false; error: ErrorKind }
-    },
-    [MSG.OFFSCREEN_CONNECT_CLIENT]: {
-        req: {} as { remoteDescriptor: string },
-        res: {} as { ok: true; descriptor: string } | { ok: false; error: ErrorKind }
-    },
-    [MSG.OFFSCREEN_APPLY_REMOTE]: {
-        req: {} as { remoteDescriptor: string },
-        res: {} as { ok: true } | { ok: false; error: ErrorKind }
-    },
     [MSG.OFFSCREEN_SEND_PEER]: {
-        req: {} as { payloadKind: PayloadKind; text: string; deadlineMs?: number },
+        req: {} as {
+            payloadKind: typeof PAYLOAD_KIND.ECHO | typeof PAYLOAD_KIND.PING;
+            text: string;
+            deadlineMs?: number;
+        },
         res: {} as { ok: true; requestId: string } | { ok: false; error: ErrorKind }
     },
     [MSG.OFFSCREEN_CLOSE]: {
@@ -162,20 +176,49 @@ export const MESSAGE_SPEC = {
             state: Lifecycle;
             role: Role | null;
             connectionId: string | null;
-            localDescriptor: string | null;
+            authorized: boolean;
+            pairing: PairingSnapshot;
             error: ErrorKind | null;
         }
+    },
+    [MSG.OFFSCREEN_PAIRING]: {
+        req: {} as PairingCommand,
+        res: {} as PairingCommandResult
     },
     [MSG.OFFSCREEN_EVENT]: {
         req: {} as {
             state: Lifecycle;
             role: Role | null;
             connectionId: string | null;
-            localDescriptor: string | null;
+            authorized: boolean;
+            pairing: PairingSnapshot;
             error: ErrorKind | null;
             peerMessage?: { payloadKind: PayloadKind; text: string; requestId: string };
         },
         res: {} as { ok: true }
+    },
+    [MSG.OFFSCREEN_PAIRING_STORAGE]: {
+        req: {} as { action: 'get' | 'role' | 'clear' } | { action: 'set'; pair: PairedBrowser },
+        res: {} as { ok: true; value: PairedBrowser | Role | null } | { ok: false; error: ErrorKind }
+    },
+    [MSG.OFFSCREEN_APP_REQUEST]: {
+        req: {} as {
+            kind: typeof PAYLOAD_KIND.SLACK_LIST | typeof PAYLOAD_KIND.SLACK_CAPTURE | typeof PAYLOAD_KIND.SLACK_VERIFY;
+            source?: unknown;
+            deadlineMs: number;
+            connectionId: string;
+        },
+        res: {} as { ok: true; payload: unknown } | { ok: false; error: string }
+    },
+    [MSG.OFFSCREEN_APP_INBOUND]: {
+        req: {} as {
+            kind: typeof PAYLOAD_KIND.SLACK_LIST | typeof PAYLOAD_KIND.SLACK_CAPTURE | typeof PAYLOAD_KIND.SLACK_VERIFY;
+            source?: unknown;
+            requestId: string;
+            connectionId: string;
+            deadline: number;
+        },
+        res: {} as { kind: string; sources?: unknown; session?: unknown; error?: string }
     },
 
     [MSG.OPTIONS_GET_STATUS]: {
@@ -185,7 +228,8 @@ export const MESSAGE_SPEC = {
             state: Lifecycle;
             role: Role | null;
             connectionId: string | null;
-            localDescriptor: string | null;
+            authorized: boolean;
+            pairing: PairingSnapshot;
             error: ErrorKind | null;
         }
     },
@@ -193,31 +237,26 @@ export const MESSAGE_SPEC = {
         req: {} as Record<string, never>,
         res: {} as { ok: true } | { ok: false; error: ErrorKind }
     },
-    [MSG.OPTIONS_START_HOST]: {
-        req: {} as Record<string, never>,
-        res: {} as { ok: true; descriptor: string } | { ok: false; error: ErrorKind }
-    },
-    [MSG.OPTIONS_START_CLIENT]: {
-        req: {} as { remoteDescriptor: string },
-        res: {} as { ok: true; descriptor: string } | { ok: false; error: ErrorKind }
-    },
-    [MSG.OPTIONS_APPLY_ANSWER]: {
-        req: {} as { remoteDescriptor: string },
-        res: {} as { ok: true } | { ok: false; error: ErrorKind }
-    },
     [MSG.OPTIONS_SEND_SYNTHETIC]: {
-        req: {} as { payloadKind: PayloadKind; text: string; deadlineMs: number },
+        req: {} as {
+            payloadKind: typeof PAYLOAD_KIND.ECHO | typeof PAYLOAD_KIND.PING;
+            text: string;
+            deadlineMs: number;
+        },
         res: {} as { ok: true; requestId: string } | { ok: false; error: ErrorKind }
+    },
+    [MSG.PAIRING]: {
+        req: {} as PairingCommand,
+        res: {} as PairingCommandResult
     },
 
     [MSG.REQUEST_START]: {
         req: {} as {
             applicationKey: string;
-            intendedAccount: string;
-            intendedOriginTab: number;
-            allowedReturnOrigins: readonly string[];
+            source?: unknown;
+            sharedSessionConsent?: unknown;
         },
-        res: {} as { ok: true; requestId: string } | { ok: false; error: ErrorKind; reason?: string }
+        res: {} as { ok: true; requestId: string } | { ok: false; error: string }
     },
     [MSG.REQUEST_CANCEL]: {
         req: {} as { requestId?: string },
@@ -233,7 +272,16 @@ export const MESSAGE_SPEC = {
             since: number | null;
             error: ErrorKind | null;
             reason: string | null;
+            destinationTabId?: number | null;
         }
+    },
+    [MSG.SLACK_ENABLE]: {
+        req: {} as { sharedSessionConsent: true },
+        res: {} as { ok: true } | { ok: false; error: string }
+    },
+    [MSG.SLACK_LIST]: {
+        req: {} as Record<string, never>,
+        res: {} as { ok: true; sources: unknown[] } | { ok: false; error: string }
     }
 } as const;
 

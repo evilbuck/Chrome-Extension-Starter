@@ -60,7 +60,5 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 chrome.runtime.onInstalled.addListener(async (details) => {
     logger.info(`[background] Extension installed (reason: ${details.reason})`);
     const tabs = await chrome.tabs.query({});
-    await Promise.allSettled(
-        tabs.filter((t) => t.id != null).map((t) => applyActionPolicy(t.id as number, t.url))
-    );
+    await Promise.allSettled(tabs.filter((t) => t.id != null).map((t) => applyActionPolicy(t.id as number, t.url)));
 });

@@ -26,10 +26,7 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
         fallback: ValueOf<S[A], K>
     ): Promise<ValueOf<S[A], K>>;
 
-    function get<A extends Area, K extends keyof S[A]>(
-        area: A,
-        key: K
-    ): Promise<ValueOf<S[A], K> | undefined>;
+    function get<A extends Area, K extends keyof S[A]>(area: A, key: K): Promise<ValueOf<S[A], K> | undefined>;
 
     async function get(area: AllAreas, key: string, fallback?: unknown): Promise<unknown> {
         const bucket = areaOf(area);
@@ -54,11 +51,7 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
         return result;
     }
 
-    function set<A extends Area, K extends keyof S[A]>(
-        area: A,
-        key: K,
-        value: ValueOf<S[A], K>
-    ): Promise<void>;
+    function set<A extends Area, K extends keyof S[A]>(area: A, key: K, value: ValueOf<S[A], K>): Promise<void>;
 
     async function set(area: AllAreas, key: string, value: unknown): Promise<void> {
         const bucket = areaOf(area);
@@ -85,17 +78,11 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
         key: K,
         cb: (current: ValueOf<S[A], K> | undefined, previous: ValueOf<S[A], K> | undefined) => void
     ): (() => void) => {
-        const handler = (
-            changes: { [k: string]: chrome.storage.StorageChange },
-            areaName: string
-        ): void => {
+        const handler = (changes: { [k: string]: chrome.storage.StorageChange }, areaName: string): void => {
             if ((areaName as Area) !== area) return;
             const change = changes[key as string];
             if (!change) return;
-            cb(
-                change.newValue as ValueOf<S[A], K> | undefined,
-                change.oldValue as ValueOf<S[A], K> | undefined
-            );
+            cb(change.newValue as ValueOf<S[A], K> | undefined, change.oldValue as ValueOf<S[A], K> | undefined);
         };
         chrome.storage.onChanged.addListener(handler);
         return () => chrome.storage.onChanged.removeListener(handler);

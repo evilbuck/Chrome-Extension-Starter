@@ -106,10 +106,10 @@
     "description": "Default title for extension action"
   },
   "transportTitle": {
-    "message": "Transport — extension-only WebRTC"
+    "message": "Connection"
   },
   "transportDescription": {
-    "message": "Manual offer/answer setup between host and client over the real LAN/tailnet route. Phase 2 transport gate."
+    "message": "Pair two Chrome profiles with a five-character code, then confirm both browsers."
   },
   "transportState": {
     "message": "State"
@@ -119,21 +119,6 @@
   },
   "transportError": {
     "message": "Error"
-  },
-  "transportLocalDescriptor": {
-    "message": "Local descriptor"
-  },
-  "transportRemoteDescriptor": {
-    "message": "Remote descriptor (paste from peer)"
-  },
-  "transportStartHost": {
-    "message": "Start host (create offer)"
-  },
-  "transportStartClient": {
-    "message": "Start client (accept offer)"
-  },
-  "transportApplyAnswer": {
-    "message": "Apply remote answer"
   },
   "transportDisconnect": {
     "message": "Disconnect"
@@ -148,7 +133,7 @@
     "message": "Transport status"
   },
   "transportStatusDescription": {
-    "message": "State of the extension-only WebRTC transport. Phase 2 transport gate."
+    "message": "State of the extension-only WebRTC transport."
   },
   "loading": {
     "message": "Loading..."
@@ -182,5 +167,98 @@
   },
   "roleClient": {
     "message": "Client"
-  }
+  },
+  "pairingTitle": {
+    "message": "Pair browsers"
+  },
+  "pairingDescription": {
+    "message": "Generate a five-character code on the host. Type it once on the other Chrome profile, then confirm both browsers. The pairing service is trusted only for this first introduction."
+  },
+  "pairingPageHelp": {
+    "message": "Choose this profile’s role, pair the other browser with a five-character code, then confirm both sides. Slack sharing stays optional."
+  },
+  "pairingGenerate": {
+    "message": "Generate code"
+  },
+  "pairingJoin": {
+    "message": "Find"
+  },
+  "pairingCodeLabel": {
+    "message": "Pairing code"
+  },
+  "pairingCodeHelp": {
+    "message": "Type the five-character code. Letters are capitalized automatically."
+  },
+  "pairingConfirm": {
+    "message": "Confirm this browser"
+  },
+  "pairingCancel": {
+    "message": "Cancel pairing"
+  },
+  "pairingReject": {
+    "message": "Reject"
+  },
+  "pairingConnect": {
+    "message": "Connect to paired browser"
+  },
+  "pairingDisconnect": {
+    "message": "Disconnect"
+  },
+  "pairingForget": {
+    "message": "Forget paired browser"
+  },
+  "pairingExpires": {
+    "message": "Expires in"
+  },
+  "pairingPending": {
+    "message": "Browser waiting to pair"
+  },
+  "pairingPaired": {
+    "message": "Paired with"
+  },
+  "pairingRoleLocked": {
+    "message": "Role is locked while a pair is remembered. Forget the pair to change it."
+  },
+  "pairingChooseRole": {
+    "message": "Choose this profile’s role before generating or entering a code."
+  },
+  "pairingOpenOptions": {
+    "message": "Open options to pair browsers"
+  },
+  "slackTitle": { "message": "Slack" },
+  "slackHostHelp": {
+    "message": "Enable sharing on this browser, sign into Slack normally if needed, then refresh sources. The client starts the transfer. Microsoft 365 and Zoom are not supported."
+  },
+  "slackClientHelp": {
+    "message": "Enable sharing on this browser too. This profile must not already be signed into Slack — existing sessions are not overwritten. Connect to the host, choose the workspace, then start. Microsoft 365 and Zoom are not supported."
+  },
+  "slackRoleHelp": {
+    "message": "Set this profile’s role before transferring Slack. Microsoft 365 and Zoom are not supported."
+  },
+  "slackOpenOptions": { "message": "Open options to set role" },
+  "slackConsent": {
+    "message": "I authorize transfer of the shared Slack session between my host and this browser. These credentials may grant access beyond the selected workspace, including its Enterprise Grid identity."
+  },
+  "slackEnable": { "message": "Enable Slack" },
+  "slackEnabled": { "message": "Sharing enabled" },
+  "slackOpenHost": { "message": "Open Slack to sign in" },
+  "slackRefreshSources": { "message": "Refresh sources" },
+  "slackNeedConnection": {
+    "message": "Connect this profile to the host before listing sources or starting a transfer."
+  },
+  "slackHostEmpty": {
+    "message": "No ready Slack session on this browser. Open Slack, sign in normally, then refresh sources. There is no automatic sign-in."
+  },
+  "slackClientEmpty": {
+    "message": "The host has no ready Slack session. On the host, open Slack, sign in normally, then refresh sources here."
+  },
+  "slackChooseSource": { "message": "Choose workspace" },
+  "slackChooseClient": {
+    "message": "Select the intended workspace and account. Selection is required before starting."
+  },
+  "slackChooseHost": {
+    "message": "These workspaces are available for the client to request. Start the transfer from the client."
+  },
+  "slackStart": { "message": "Start Slack transfer" },
+  "slackOpenDestination": { "message": "Open transferred Slack tab" }
 }

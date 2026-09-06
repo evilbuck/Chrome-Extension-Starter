@@ -22,25 +22,18 @@
 //
 // Tests stub RTCPeerConnection via vitest globals (see __tests__/peer.test.ts).
 
+import { ENVELOPE_VERSION, ERROR_KIND, LIFECYCLE, type Lifecycle, PAYLOAD_KIND, type Role } from '@/shared/constants';
 import {
-    ENVELOPE_VERSION,
-    ERROR_KIND,
-    LIFECYCLE,
-    PAYLOAD_KIND,
-    type Lifecycle,
-    type Role
-} from '@/shared/constants';
-import {
+    type DescriptorEnvelope,
     encodeDescriptor,
     encodePeerRequest,
     encodePeerResponse,
     isPeerExpired,
-    parseDescriptor,
-    parsePeer,
-    type DescriptorEnvelope,
     type PeerEnvelope,
     type PeerPayload,
-    type PeerResponsePayload
+    type PeerResponsePayload,
+    parseDescriptor,
+    parsePeer
 } from '@/shared/lib/envelope';
 import { isUuidV4, randomUuid } from '@/shared/lib/uuid';
 
@@ -64,11 +57,6 @@ export interface PeerEventState {
     error: string | null;
 }
 
-export interface PeerEventDescriptor {
-    state: Lifecycle;
-    descriptor: string;
-}
-
 export interface PeerEventMessage {
     state: Lifecycle;
     envelope: PeerEnvelope;
@@ -84,7 +72,6 @@ export type PeerListener = (event: PeerEvent) => void;
 
 export type PeerEvent =
     | ({ type: 'state' } & PeerEventState)
-    | ({ type: 'descriptor' } & PeerEventDescriptor)
     | ({ type: 'message' } & PeerEventMessage)
     | ({ type: 'response' } & PeerEventResponse)
     | ({ type: 'channel-open' } & PeerEventState)
@@ -155,11 +142,8 @@ const defaultChannelInit = (): RTCDataChannelInit => ({
     // maxRetransmits omitted → reliable
 });
 
-const defaultChannelFactory = (
-    pc: RTCPeerConnection,
-    label: string,
-    init?: RTCDataChannelInit
-): RTCDataChannel => pc.createDataChannel(label, init);
+const defaultChannelFactory = (pc: RTCPeerConnection, label: string, init?: RTCDataChannelInit): RTCDataChannel =>
+    pc.createDataChannel(label, init);
 
 // ---------------------------------------------------------------------------
 // Peer class
@@ -181,8 +165,8 @@ export class Peer {
     private readonly inboundReplayIds = new Set<string>();
     private readonly pendingByRequestId = new Map<string, PendingRequest>();
     private readonly options: PeerOptions;
-    private localDescriptor: string | null = null;
-    private candidateGathering: { promise: Promise<void>; resolve: () => void; reject: (err: Error) => void } | null = null;
+    private candidateGathering: { promise: Promise<void>; resolve: () => void; reject: (err: Error) => void } | null =
+        null;
 
     constructor(options: PeerOptions) {
         if (!isUuidV4(options.connectionId)) {
@@ -202,10 +186,6 @@ export class Peer {
 
     getError(): string | null {
         return this.error;
-    }
-
-    getLocalDescriptor(): string | null {
-        return this.localDescriptor;
     }
 
     subscribe(fn: PeerListener): () => void {
@@ -277,9 +257,7 @@ export class Peer {
 
         const channel = this.channel;
         if (!channel || channel.readyState !== 'open') {
-            return Promise.reject(
-                new EnvelopeSendError(ERROR_KIND.CHANNEL_CLOSED, 'data channel is not open')
-            );
+            return Promise.reject(new EnvelopeSendError(ERROR_KIND.CHANNEL_CLOSED, 'data channel is not open'));
         }
 
         const requestId = randomUuid();
@@ -360,12 +338,7 @@ export class Peer {
     private cancelAllPending(reason: string): void {
         for (const [id, pending] of this.pendingByRequestId.entries()) {
             clearTimeout(pending.timer);
-            pending.reject(
-                new EnvelopeSendError(
-                    ERROR_KIND.CHANNEL_CLOSED,
-                    `${reason}; request ${id} cancelled`
-                )
-            );
+            pending.reject(new EnvelopeSendError(ERROR_KIND.CHANNEL_CLOSED, `${reason}; request ${id} cancelled`));
         }
         this.pendingByRequestId.clear();
     }
@@ -519,9 +492,7 @@ export class Peer {
             sdp: JSON.stringify(pc.localDescription)
         };
         const json = encodeDescriptor(env);
-        this.localDescriptor = json;
         this.emit({ type: 'state', state: this.state, error: null });
-        this.emit({ type: 'descriptor', state: this.state, descriptor: json });
         return json;
     }
 

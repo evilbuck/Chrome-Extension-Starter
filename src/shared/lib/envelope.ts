@@ -13,11 +13,21 @@ import {
     DESCRIPTOR_MAX_BYTES,
     ENVELOPE_VERSION,
     ERROR_KIND,
-    PAYLOAD_KIND,
-    PEER_VERSION,
     type ErrorKind,
+    PAYLOAD_KIND,
+    PAYLOAD_RESPONSE_KIND,
+    PEER_MAX_BYTES,
+    PEER_VERSION,
     type Role
 } from '@/shared/constants';
+import {
+    isSlackSession,
+    isSlackSource,
+    SLACK_FAILURES,
+    type SlackFailure,
+    type SlackSession,
+    type SlackSource
+} from '@/shared/lib/slack';
 import { isUuidV4 } from '@/shared/lib/uuid';
 
 // ---------------------------------------------------------------------------
@@ -133,10 +143,8 @@ const parseDescriptorFields = (
     return { v: ENVELOPE_VERSION, role, connectionId, created, expires, sdp };
 };
 
-export const parseDescriptor = (
-    raw: string,
-    expected: { role: Role; connectionId: string }
-): DescriptorEnvelope => parseDescriptorFields(raw, expected, true);
+export const parseDescriptor = (raw: string, expected: { role: Role; connectionId: string }): DescriptorEnvelope =>
+    parseDescriptorFields(raw, expected, true);
 
 export const parseDescriptorAdopt = (raw: string, expected: { role: Role }): DescriptorEnvelope =>
     parseDescriptorFields(raw, expected, false);
@@ -170,16 +178,65 @@ export interface PeerCancelPayload {
     requestId: string;
 }
 
+export interface SlackListPayload {
+    kind: typeof PAYLOAD_KIND.SLACK_LIST;
+}
+
+export interface SlackCapturePayload {
+    kind: typeof PAYLOAD_KIND.SLACK_CAPTURE;
+    source: SlackSource;
+}
+
+export interface SlackVerifyPayload {
+    kind: typeof PAYLOAD_KIND.SLACK_VERIFY;
+    source: SlackSource;
+}
+
 /** A response frame's payload carries the original requestId in `replyTo`.
  *  It is structurally distinct from any request payload. */
 export interface PeerEchoResponsePayload {
-    kind: 'echo_response';
+    kind: typeof PAYLOAD_RESPONSE_KIND.ECHO_RESPONSE;
     replyTo: string;
     text: string;
 }
 
-export type PeerPayload = PeerEchoPayload | PeerPingPayload | PeerCancelPayload;
-export type PeerResponsePayload = PeerEchoResponsePayload;
+export interface SlackSourcesPayload {
+    kind: typeof PAYLOAD_RESPONSE_KIND.SLACK_SOURCES;
+    replyTo: string;
+    sources: SlackSource[];
+}
+
+export interface SlackSessionPayload {
+    kind: typeof PAYLOAD_RESPONSE_KIND.SLACK_SESSION;
+    replyTo: string;
+    session: SlackSession;
+}
+
+export interface SlackVerifiedPayload {
+    kind: typeof PAYLOAD_RESPONSE_KIND.SLACK_VERIFIED;
+    replyTo: string;
+}
+
+export interface SlackErrorPayload {
+    kind: typeof PAYLOAD_RESPONSE_KIND.SLACK_ERROR;
+    replyTo: string;
+    error: SlackFailure;
+}
+
+export type PeerPayload =
+    | PeerEchoPayload
+    | PeerPingPayload
+    | PeerCancelPayload
+    | SlackListPayload
+    | SlackCapturePayload
+    | SlackVerifyPayload;
+
+export type PeerResponsePayload =
+    | PeerEchoResponsePayload
+    | SlackSourcesPayload
+    | SlackSessionPayload
+    | SlackVerifiedPayload
+    | SlackErrorPayload;
 
 export interface PeerRequestEnvelope {
     v: typeof PEER_VERSION;
@@ -207,8 +264,28 @@ export type PeerEnvelope = PeerRequestEnvelope | PeerResponseEnvelope;
 
 const PEER_KEYS = ['v', 'role', 'connectionId', 'requestId', 'deadline', 'replyTo', 'payload'] as const;
 
+const SLACK_REQUEST_KINDS = [PAYLOAD_KIND.SLACK_LIST, PAYLOAD_KIND.SLACK_CAPTURE, PAYLOAD_KIND.SLACK_VERIFY] as const;
+
+const onlyKeys = (obj: Record<string, unknown>, keys: readonly string[]): boolean =>
+    Object.keys(obj).every((key) => keys.includes(key));
+
+const byteLength = (value: unknown): number =>
+    new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value)).byteLength;
+
+const parseSlackSourceField = (obj: Record<string, unknown>): SlackSource => {
+    if (!isSlackSource(obj.source)) return fail(ERROR_KIND.MALFORMED, 'slack source is invalid');
+    return obj.source;
+};
+
 const parseRequestPayload = (obj: Record<string, unknown>): PeerPayload => {
-    const kind = requireEnum(obj, 'kind', [PAYLOAD_KIND.ECHO, PAYLOAD_KIND.PING, PAYLOAD_KIND.CANCEL] as const);
+    const kind = requireEnum(obj, 'kind', [
+        PAYLOAD_KIND.ECHO,
+        PAYLOAD_KIND.PING,
+        PAYLOAD_KIND.CANCEL,
+        PAYLOAD_KIND.SLACK_LIST,
+        PAYLOAD_KIND.SLACK_CAPTURE,
+        PAYLOAD_KIND.SLACK_VERIFY
+    ] as const);
     if (kind === PAYLOAD_KIND.ECHO) {
         const text = requireString(obj, 'text');
         if (text.length === 0) fail(ERROR_KIND.MALFORMED, 'echo.text must be non-empty');
@@ -223,19 +300,71 @@ const parseRequestPayload = (obj: Record<string, unknown>): PeerPayload => {
         if (!isUuidV4(requestId)) fail(ERROR_KIND.MALFORMED, 'cancel.requestId is not a valid UUID v4');
         return { kind, requestId };
     }
+    if (kind === PAYLOAD_KIND.SLACK_LIST) {
+        if (!onlyKeys(obj, ['kind'])) fail(ERROR_KIND.MALFORMED, 'slack_list payload has unexpected fields');
+        return { kind };
+    }
+    if (kind === PAYLOAD_KIND.SLACK_CAPTURE) {
+        if (!onlyKeys(obj, ['kind', 'source']))
+            fail(ERROR_KIND.MALFORMED, 'slack_capture payload has unexpected fields');
+        return { kind, source: parseSlackSourceField(obj) };
+    }
+    if (kind === PAYLOAD_KIND.SLACK_VERIFY) {
+        if (!onlyKeys(obj, ['kind', 'source']))
+            fail(ERROR_KIND.MALFORMED, 'slack_verify payload has unexpected fields');
+        return { kind, source: parseSlackSourceField(obj) };
+    }
     return fail(ERROR_KIND.MALFORMED, `unknown request payload kind: ${String(kind)}`);
 };
 
+const SLACK_SOURCE_CAP = 32;
+
 const parseResponsePayload = (obj: Record<string, unknown>): PeerResponsePayload => {
-    const kind = requireEnum(obj, 'kind', ['echo_response'] as const);
-    if (kind === 'echo_response') {
-        const replyTo = requireString(obj, 'replyTo');
-        if (!isUuidV4(replyTo)) fail(ERROR_KIND.MALFORMED, 'echo_response.replyTo is not a valid UUID v4');
+    const kind = requireEnum(obj, 'kind', [
+        PAYLOAD_RESPONSE_KIND.ECHO_RESPONSE,
+        PAYLOAD_RESPONSE_KIND.SLACK_SOURCES,
+        PAYLOAD_RESPONSE_KIND.SLACK_SESSION,
+        PAYLOAD_RESPONSE_KIND.SLACK_VERIFIED,
+        PAYLOAD_RESPONSE_KIND.SLACK_ERROR
+    ] as const);
+    const replyTo = requireString(obj, 'replyTo');
+    if (!isUuidV4(replyTo)) fail(ERROR_KIND.MALFORMED, `${kind}.replyTo is not a valid UUID v4`);
+    if (kind === PAYLOAD_RESPONSE_KIND.ECHO_RESPONSE) {
         const text = requireString(obj, 'text');
-        return { kind: 'echo_response', replyTo, text };
+        return { kind, replyTo, text };
+    }
+    if (kind === PAYLOAD_RESPONSE_KIND.SLACK_SOURCES) {
+        if (!onlyKeys(obj, ['kind', 'replyTo', 'sources']))
+            fail(ERROR_KIND.MALFORMED, 'slack_sources payload has unexpected fields');
+        if (!Array.isArray(obj.sources) || obj.sources.length > SLACK_SOURCE_CAP || !obj.sources.every(isSlackSource)) {
+            return fail(ERROR_KIND.MALFORMED, 'slack_sources.sources is invalid');
+        }
+        return { kind, replyTo, sources: obj.sources };
+    }
+    if (kind === PAYLOAD_RESPONSE_KIND.SLACK_SESSION) {
+        if (!onlyKeys(obj, ['kind', 'replyTo', 'session']))
+            fail(ERROR_KIND.MALFORMED, 'slack_session payload has unexpected fields');
+        if (!isSlackSession(obj.session)) return fail(ERROR_KIND.MALFORMED, 'slack_session.session is invalid');
+        return { kind, replyTo, session: obj.session };
+    }
+    if (kind === PAYLOAD_RESPONSE_KIND.SLACK_VERIFIED) {
+        if (!onlyKeys(obj, ['kind', 'replyTo']))
+            fail(ERROR_KIND.MALFORMED, 'slack_verified payload has unexpected fields');
+        return { kind, replyTo };
+    }
+    if (kind === PAYLOAD_RESPONSE_KIND.SLACK_ERROR) {
+        if (!onlyKeys(obj, ['kind', 'replyTo', 'error']))
+            fail(ERROR_KIND.MALFORMED, 'slack_error payload has unexpected fields');
+        const error = requireString(obj, 'error');
+        if (!(SLACK_FAILURES as readonly string[]).includes(error))
+            fail(ERROR_KIND.MALFORMED, 'slack_error.error is invalid');
+        return { kind, replyTo, error: error as SlackFailure };
     }
     return fail(ERROR_KIND.MALFORMED, `unknown response payload kind: ${String(kind)}`);
 };
+
+export const isSlackRequestKind = (kind: string): kind is (typeof SLACK_REQUEST_KINDS)[number] =>
+    (SLACK_REQUEST_KINDS as readonly string[]).includes(kind);
 
 /** Build a peer request envelope. Pure: does not transmit. */
 export const encodePeerRequest = (
@@ -289,11 +418,10 @@ export const encodePeerResponse = (
  * Validate and parse a peer message envelope. Returns either a request
  * envelope or a response envelope (discriminated by `replyTo`).
  */
-export const parsePeer = (
-    raw: unknown,
-    expected: { role: Role; connectionId: string }
-): PeerEnvelope => {
+export const parsePeer = (raw: unknown, expected: { role: Role; connectionId: string }): PeerEnvelope => {
     if (typeof raw === 'string') {
+        if (byteLength(raw) > PEER_MAX_BYTES)
+            fail(ERROR_KIND.OVERSIZED, `peer message exceeds ${PEER_MAX_BYTES} bytes`);
         let parsed: unknown;
         try {
             parsed = JSON.parse(raw);
@@ -306,6 +434,7 @@ export const parsePeer = (
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
         fail(ERROR_KIND.MALFORMED, 'peer message must be an object or JSON string');
     }
+    if (byteLength(raw) > PEER_MAX_BYTES) fail(ERROR_KIND.OVERSIZED, `peer message exceeds ${PEER_MAX_BYTES} bytes`);
     const obj = raw as Record<string, unknown>;
     for (const k of Object.keys(obj)) {
         if (!(PEER_KEYS as readonly string[]).includes(k)) {
@@ -348,7 +477,7 @@ export const parsePeer = (
     if (replyTo !== undefined) {
         const response = parseResponsePayload(payloadObj);
         if (response.replyTo !== replyTo) {
-            fail(ERROR_KIND.MALFORMED, "top-level replyTo does not match payload.replyTo");
+            fail(ERROR_KIND.MALFORMED, 'top-level replyTo does not match payload.replyTo');
         }
         return {
             v: PEER_VERSION,

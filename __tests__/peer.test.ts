@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LIFECYCLE, PAYLOAD_KIND, ROLE, type Lifecycle } from '@/shared/constants';
+import { LIFECYCLE, type Lifecycle, PAYLOAD_KIND, ROLE } from '@/shared/constants';
 import { Peer } from '@/shared/lib/peer';
 
 // ---------------------------------------------------------------------------
@@ -91,8 +91,12 @@ const makeFakePeer = (): FakePeer => {
             if (this.onconnectionstatechange) this.onconnectionstatechange(new Event('state'));
         },
         signalingState: 'stable',
-        get connectionState() { return this._connectionState; },
-        get iceGatheringState() { return this._iceGatheringState; },
+        get connectionState() {
+            return this._connectionState;
+        },
+        get iceGatheringState() {
+            return this._iceGatheringState;
+        },
         localDescription: null
     };
     peerRegistry.push(peer);
@@ -169,10 +173,7 @@ describe('waitForIceComplete', () => {
 // sendRequest / sendReply via Peer (no real cross-peer correlation in JSDOM)
 // ---------------------------------------------------------------------------
 
-
 describe('sendRequest / sendReply (correlation)', () => {
-
-
     it('disconnected connection state cancels pending requests immediately', async () => {
         const host = new Peer({ role: ROLE.HOST, connectionId: '00000000-0000-4000-8000-000000000021' });
         await host.hostCreateOffer();
@@ -218,7 +219,6 @@ describe('sendRequest / sendReply (correlation)', () => {
         internalChannel.close();
         await expect(p).rejects.toMatchObject({ kind: 'channel_closed' });
     });
-
 });
 
 // ---------------------------------------------------------------------------

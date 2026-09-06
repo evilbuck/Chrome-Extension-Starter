@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+* Add experimental Slack session transfer over the existing WebRTC connection for the observed Enterprise Grid/member-workspace account shape.
+* Add optional Slack permissions, explicit shared-session consent, workspace/account selection, cancellation, client reload verification, and host-preservation checks.
+* Refuse existing client sessions and preserve newer logins during interrupted-transfer cleanup using non-secret ownership fingerprints.
+* Replace manual offer/answer copying with hosted five-character pairing codes and explicit confirmation on both browsers.
+* Remember paired browser keys for code-free reconnect; add disconnect/forget controls while keeping application data on direct WebRTC.
+
 ## [1.7.0](https://github.com/carry0987/Chrome-Extension-Starter/compare/v1.6.0...v1.7.0) (2026-04-13)
 
 

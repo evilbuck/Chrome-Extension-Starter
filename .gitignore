@@ -11,6 +11,9 @@ node_modules
 # Generated files
 .docusaurus
 .cache-loader
+.wrangler/
+.dev.vars*
+services/pairing/worker-configuration.d.ts
 
 # Misc
 .DS_Store

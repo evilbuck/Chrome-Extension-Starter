@@ -19,3 +19,5 @@ status: active
 - [ ] [Phase 10: Finish demonstrated cutover](items/phase-10-demonstrated-cutover.md)
 
 Only Phase 1 is in the active queue. Phases 2 and 3 become parallel-safe after Phase 1; Phases 4–10 are sequential. The original transport and application-handoff backlog items remain supporting detail linked from the corresponding phase items.
+
+Completed setup work (2026-09-06): [five-character browser pairing](../2026-09-06.short-code-pairing/index.md) is deployed to the personal Cloudflare account and verified with two real Chrome profiles. One typed code and bilateral confirmation replace descriptor copying; code-free reconnect and forget preserve the direct-WebRTC/Slack authorization boundaries. Physical Mac/Linux and the original application gates below remain open.

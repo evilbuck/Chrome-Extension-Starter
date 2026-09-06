@@ -1,4 +1,4 @@
-// Offscreen document — RTCPeerConnection owner.
+// Offscreen document — RTCPeerConnection owner and pairing controller.
 //
 // Owns the single RTCPeerConnection and the ordered reliable data channel.
 // Communicates with the service worker via chrome.runtime messages only;
@@ -11,41 +11,44 @@
 // matches the inbound requestId, so the originating peer's pending
 // Promise resolves.
 
+import { createBrowserPairingDeps, PairingController } from '@/offscreen/pairing';
 import {
     ERROR_KIND,
     type ErrorKind,
     LIFECYCLE,
-    type Lifecycle,
     MSG,
     OFFSCREEN_TARGET,
     PAYLOAD_KIND,
-    type PayloadKind,
-    type Role
+    PAYLOAD_RESPONSE_KIND,
+    type PayloadKind
 } from '@/shared/constants';
+import {
+    isSlackRequestKind,
+    type PeerEnvelope,
+    type PeerPayload,
+    type PeerResponsePayload
+} from '@/shared/lib/envelope';
 import { logger } from '@/shared/lib/logger';
-import { PEER_PAYLOAD_KIND, Peer, type PeerEnvelope, type PeerPayload } from '@/shared/lib/peer';
+import { isPairingCommand } from '@/shared/lib/pairing-protocol';
+import { PEER_PAYLOAD_KIND } from '@/shared/lib/peer';
+import { isSlackSource } from '@/shared/lib/slack';
 
-// ---------------------------------------------------------------------------
-// State
-// ---------------------------------------------------------------------------
-
-let peer: Peer | null = null;
-let role: Role | null = null;
-let connectionId: string | null = null;
-let lifecycle: Lifecycle = LIFECYCLE.IDLE;
-let lastError: ErrorKind | null = null;
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+const pairing = new PairingController(
+    createBrowserPairingDeps({
+        onChange: () => report(),
+        onPeerMessage: (envelope) => handleInboundPeerMessage(envelope)
+    })
+);
 
 const report = (extra?: { peerMessage?: { payloadKind: PayloadKind; text: string; requestId: string } }): void => {
+    const connectionId = pairing.getConnectionId();
     const payload = {
-        state: lifecycle,
-        role,
+        state: pairing.getLifecycle(),
+        role: pairing.getRole(),
         connectionId,
-        localDescriptor: peer?.getLocalDescriptor() ?? null,
-        error: lastError,
+        authorized: connectionId !== null && pairing.isAuthorized(connectionId),
+        pairing: pairing.snapshot(),
+        error: pairing.getLastError(),
         ...(extra ?? {})
     };
     chrome.runtime.sendMessage({ type: MSG.OFFSCREEN_EVENT, payload }).catch(() => {
@@ -53,48 +56,74 @@ const report = (extra?: { peerMessage?: { payloadKind: PayloadKind; text: string
     });
 };
 
-const setLifecycle = (next: Lifecycle, err: ErrorKind | null = null): void => {
-    lifecycle = next;
-    lastError = err;
-    report();
-};
-
-const ensurePeer = (): Peer => {
-    if (!role || !connectionId) {
-        throw { ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST };
-    }
-    if (peer) return peer;
-    peer = new Peer({ role, connectionId });
-    peer.subscribe((ev) => {
-        if (ev.type === 'state') {
-            lifecycle = ev.state;
-            lastError = (ev.error as ErrorKind | null) ?? null;
-            report();
-        } else if (ev.type === 'response') {
-            // Worker doesn't need to act on responses; they are observable
-            // for future UI use.
-            report();
-        } else if (ev.type === 'message') {
-            handleInboundPeerMessage(ev.envelope);
-        } else if (ev.type === 'descriptor') {
-            lifecycle = ev.state;
-            report();
-        } else {
-            lifecycle = ev.state;
-            report();
+const handleSlackInbound = (envelope: PeerEnvelope): void => {
+    const peer = pairing.getPeer();
+    if (pairing.getRole() !== 'host' || !peer) return;
+    if (!pairing.isAuthorized(envelope.connectionId)) return;
+    if (typeof envelope.replyTo === 'string') return;
+    if (!isSlackRequestKind(envelope.payload.kind)) return;
+    const payload = envelope.payload;
+    const respondingPeer = peer;
+    const respondingConnection = envelope.connectionId;
+    void (async () => {
+        let reply: PeerResponsePayload = {
+            kind: PAYLOAD_RESPONSE_KIND.SLACK_ERROR,
+            replyTo: envelope.requestId,
+            error: 'failed'
+        };
+        try {
+            const res: unknown = await chrome.runtime.sendMessage({
+                type: MSG.OFFSCREEN_APP_INBOUND,
+                payload: {
+                    kind: payload.kind,
+                    source: 'source' in payload ? payload.source : undefined,
+                    requestId: envelope.requestId,
+                    connectionId: envelope.connectionId,
+                    deadline: envelope.deadline
+                }
+            });
+            if (
+                res &&
+                typeof res === 'object' &&
+                !Array.isArray(res) &&
+                'kind' in res &&
+                typeof res.kind === 'string'
+            ) {
+                reply = { ...(res as PeerResponsePayload), replyTo: envelope.requestId };
+            }
+        } catch {
+            // Worker revival or rejected sender: do not leak credentials; reply failed.
         }
-    });
-    return peer;
+        if (
+            pairing.getPeer() !== respondingPeer ||
+            pairing.getConnectionId() !== respondingConnection ||
+            !pairing.isAuthorized(respondingConnection) ||
+            Date.now() >= envelope.deadline
+        )
+            return;
+        try {
+            const left = envelope.deadline - Date.now();
+            respondingPeer.sendReply(reply, left);
+        } catch (err) {
+            const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
+            logger.debug('[offscreen] slack reply failed:', kind);
+        }
+    })();
 };
 
 const handleInboundPeerMessage = (envelope: PeerEnvelope): void => {
-    // Report what we received so popup/options can show it.
+    if (!pairing.isAuthorized(envelope.connectionId)) return;
+    if (isSlackRequestKind(envelope.payload.kind)) {
+        handleSlackInbound(envelope);
+        return;
+    }
+
     const text =
         envelope.payload.kind === PEER_PAYLOAD_KIND.ECHO
             ? envelope.payload.text
             : envelope.payload.kind === PEER_PAYLOAD_KIND.PING
               ? envelope.payload.nonce
-              : envelope.payload.kind === 'echo_response'
+              : envelope.payload.kind === PAYLOAD_RESPONSE_KIND.ECHO_RESPONSE
                 ? envelope.payload.text
                 : '';
 
@@ -106,14 +135,18 @@ const handleInboundPeerMessage = (envelope: PeerEnvelope): void => {
         }
     });
 
-    // Auto-respond: only inbound ECHO requests get a correlated echo_response.
-    if (!peer || lifecycle !== LIFECYCLE.CONNECTED) return;
+    const peer = pairing.getPeer();
+    if (!peer || !pairing.isAuthorized(envelope.connectionId)) return;
     if (envelope.payload.kind !== PEER_PAYLOAD_KIND.ECHO) return;
-    if (typeof envelope.replyTo === 'string') return; // this IS a response; don't loop
+    if (typeof envelope.replyTo === 'string') return;
 
     try {
         peer.sendReply(
-            { kind: 'echo_response', replyTo: envelope.requestId, text: `reply:${envelope.payload.text}` },
+            {
+                kind: PAYLOAD_RESPONSE_KIND.ECHO_RESPONSE,
+                replyTo: envelope.requestId,
+                text: `reply:${envelope.payload.text}`
+            },
             5000
         );
     } catch (err) {
@@ -137,9 +170,18 @@ const isFromServiceWorker = (sender: chrome.runtime.MessageSender): boolean => {
     return sender.url === undefined || sender.url === chrome.runtime.getURL('static/js/background.js');
 };
 
-// ---------------------------------------------------------------------------
-// Inbound message handling
-// ---------------------------------------------------------------------------
+const statusPayload = () => {
+    const connectionId = pairing.getConnectionId();
+    return {
+        ok: true as const,
+        state: pairing.getLifecycle(),
+        role: pairing.getRole(),
+        connectionId,
+        authorized: connectionId !== null && pairing.isAuthorized(connectionId),
+        pairing: pairing.snapshot(),
+        error: pairing.getLastError()
+    };
+};
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     // runtime.sendMessage also reaches this document for worker-bound UI
@@ -162,100 +204,32 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 
     switch (obj.type) {
-        case MSG.OFFSCREEN_INIT: {
-            const p = obj.payload as { role?: unknown; connectionId?: unknown };
-            if (typeof p.role !== 'string' || (p.role !== 'host' && p.role !== 'client')) {
-                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+        case MSG.OFFSCREEN_PAIRING: {
+            if (!isPairingCommand(obj.payload)) {
+                sendResponse({ ok: false, error: 'invalid_message' });
                 return false;
             }
-            if (typeof p.connectionId !== 'string' || p.connectionId.length === 0) {
-                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
-                return false;
-            }
-            peer?.close();
-            peer = null;
-            role = p.role;
-            connectionId = p.connectionId;
-            setLifecycle(LIFECYCLE.IDLE);
-            sendResponse({ ok: true });
-            return false;
-        }
-
-        case MSG.OFFSCREEN_CONNECT_HOST: {
-            if (role !== 'host') {
-                sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
-                return false;
-            }
-            const p = ensurePeer();
-            p.hostCreateOffer()
-                .then((descriptor) => {
-                    setLifecycle(LIFECYCLE.SIGNALING);
-                    sendResponse({ ok: true, descriptor });
-                })
-                .catch((err: unknown) => {
-                    const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
-                    setLifecycle(LIFECYCLE.FAILED, kind);
-                    sendResponse({ ok: false, error: kind });
-                });
-            return true;
-        }
-
-        case MSG.OFFSCREEN_CONNECT_CLIENT: {
-            if (role !== 'client') {
-                sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
-                return false;
-            }
-            const p = obj.payload as { remoteDescriptor?: unknown };
-            if (typeof p.remoteDescriptor !== 'string') {
-                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
-                return false;
-            }
-            const peerInst = ensurePeer();
-            peerInst
-                .clientAcceptOffer(p.remoteDescriptor)
-                .then((descriptor) => {
-                    setLifecycle(LIFECYCLE.SIGNALING);
-                    sendResponse({ ok: true, descriptor });
-                })
-                .catch((err: unknown) => {
-                    const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
-                    setLifecycle(LIFECYCLE.FAILED, kind);
-                    sendResponse({ ok: false, error: kind });
-                });
-            return true;
-        }
-
-        case MSG.OFFSCREEN_APPLY_REMOTE: {
-            if (role !== 'host') {
-                sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
-                return false;
-            }
-            const p = obj.payload as { remoteDescriptor?: unknown };
-            if (typeof p.remoteDescriptor !== 'string') {
-                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
-                return false;
-            }
-            const peerInst = ensurePeer();
-            peerInst
-                .applyRemoteAnswer(p.remoteDescriptor)
-                .then(() => {
-                    sendResponse({ ok: true });
-                })
-                .catch((err: unknown) => {
-                    const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
-                    setLifecycle(LIFECYCLE.FAILED, kind);
-                    sendResponse({ ok: false, error: kind });
-                });
+            pairing
+                .handleCommand(obj.payload)
+                .then((result) => sendResponse(result))
+                .catch(() => sendResponse({ ok: false, error: 'unavailable' }));
             return true;
         }
 
         case MSG.OFFSCREEN_SEND_PEER: {
-            if (!peer || lifecycle !== LIFECYCLE.CONNECTED) {
+            const peer = pairing.getPeer();
+            const connectionId = pairing.getConnectionId();
+            if (
+                !peer ||
+                !connectionId ||
+                !pairing.isAuthorized(connectionId) ||
+                pairing.getLifecycle() !== LIFECYCLE.CONNECTED
+            ) {
                 sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
                 return false;
             }
             const p = obj.payload as { payloadKind?: unknown; text?: unknown; deadlineMs?: unknown };
-            if (!isPayloadKind(p.payloadKind)) {
+            if (p.payloadKind !== PAYLOAD_KIND.ECHO && p.payloadKind !== PAYLOAD_KIND.PING) {
                 sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
                 return false;
             }
@@ -271,17 +245,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                         return false;
                     }
                     payload = { kind: PAYLOAD_KIND.ECHO, text: p.text };
-                } else if (p.payloadKind === PAYLOAD_KIND.PING) {
-                    payload = { kind: PAYLOAD_KIND.PING, nonce: randomNonce() };
                 } else {
-                    sendResponse({ ok: false, error: ERROR_KIND.UNSUPPORTED_VERSION });
-                    return false;
+                    payload = { kind: PAYLOAD_KIND.PING, nonce: randomNonce() };
                 }
-                // Send as a request; resolve on matching reply.
                 peer.sendRequest(payload, p.deadlineMs)
                     .then(() => {
-                        // Resolve the caller immediately; the inbound response
-                        // arrives via OFFSCREEN_EVENT.
                         sendResponse({ ok: true });
                     })
                     .catch((err: unknown) => {
@@ -295,24 +263,73 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             return true;
         }
 
+        case MSG.OFFSCREEN_APP_REQUEST: {
+            if (pairing.getRole() !== 'client') {
+                sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
+                return false;
+            }
+            const peer = pairing.getPeer();
+            const connectionId = pairing.getConnectionId();
+            if (
+                !peer ||
+                !connectionId ||
+                !pairing.isAuthorized(connectionId) ||
+                pairing.getLifecycle() !== LIFECYCLE.CONNECTED
+            ) {
+                sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
+                return false;
+            }
+            const p = obj.payload;
+            if (!p || typeof p !== 'object' || Array.isArray(p) || !('kind' in p) || !('deadlineMs' in p)) {
+                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+                return false;
+            }
+            if (typeof p.deadlineMs !== 'number' || p.deadlineMs <= 0) {
+                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+                return false;
+            }
+            if (!('connectionId' in p) || typeof p.connectionId !== 'string' || p.connectionId !== connectionId) {
+                sendResponse({ ok: false, error: ERROR_KIND.CONNECTION_ID_MISMATCH });
+                return false;
+            }
+            if (!pairing.isAuthorized(p.connectionId)) {
+                sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
+                return false;
+            }
+            const kind = p.kind;
+            let payload: PeerPayload;
+            if (kind === PAYLOAD_KIND.SLACK_LIST) {
+                payload = { kind: PAYLOAD_KIND.SLACK_LIST };
+            } else if (
+                (kind === PAYLOAD_KIND.SLACK_CAPTURE || kind === PAYLOAD_KIND.SLACK_VERIFY) &&
+                'source' in p &&
+                isSlackSource(p.source)
+            ) {
+                payload = { kind, source: p.source };
+            } else {
+                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+                return false;
+            }
+            peer.sendRequest(payload, p.deadlineMs)
+                .then((envelope) => {
+                    sendResponse({ ok: true, payload: envelope.payload });
+                })
+                .catch((err: unknown) => {
+                    const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
+                    sendResponse({ ok: false, error: kind });
+                });
+            return true;
+        }
+
         case MSG.OFFSCREEN_CLOSE: {
-            peer?.close();
-            peer = null;
-            setLifecycle(LIFECYCLE.IDLE);
+            pairing.disconnectTransport();
             sendResponse({ ok: true });
             return false;
         }
 
         case MSG.OFFSCREEN_STATUS: {
-            sendResponse({
-                ok: true,
-                state: lifecycle,
-                role,
-                connectionId,
-                localDescriptor: peer?.getLocalDescriptor() ?? null,
-                error: lastError
-            });
-            return false;
+            void pairing.ready().then(() => sendResponse(statusPayload()));
+            return true;
         }
 
         default:
@@ -321,13 +338,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     }
 });
 
-const PAYLOAD_KIND_VALUES = Object.values(PAYLOAD_KIND) as string[];
-const isPayloadKind = (v: unknown): v is PayloadKind => typeof v === 'string' && PAYLOAD_KIND_VALUES.includes(v);
-
 const randomNonce = (): string => {
     const c = (globalThis as { crypto?: Crypto }).crypto;
     if (c?.randomUUID) return c.randomUUID();
     return Math.random().toString(36).slice(2);
 };
+
+globalThis.addEventListener('pagehide', () => {
+    pairing.dispose();
+});
 
 logger.debug('[offscreen] document loaded; awaiting commands from service worker');

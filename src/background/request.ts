@@ -1,4 +1,4 @@
-// Phase 4 request state machine.
+// Phase 4/7 request state machine.
 //
 // One active request at a time. The state progression follows the plan:
 //
@@ -7,39 +7,55 @@
 // With `waiting_for_user` as an orthogonal pause and a small set of terminal
 // non-success outcomes. Cancellation, duplicate, expiry, navigation/scope
 // change, and disconnect invalidate later results and cause no application
-// action.
+// action. Success is `state === succeeded` (no success outcome).
 //
-// Application controllers (Phase 6/7/8) plug into the verify → preparing_host
-// transition. Until those phases ship and the compatibility verdicts leave
-// `unresolved`, every controller call returns REQUEST_NOT_SUPPORTED — never a
-// stub.
+// Cancellation marks the guard invalid immediately. Dispose waits for the
+// in-flight provider promise, then runs in catch/finally so cookie writes
+// cannot complete after cleanup. The request stays busy until cleanup ends.
 
 import {
     ERROR_KIND,
+    type ErrorKind,
     REQUEST_DEADLINE_MS,
     REQUEST_OUTCOME,
     REQUEST_STATE,
-    type ErrorKind,
     type RequestOutcome,
     type RequestState
 } from '@/shared/constants';
 import { logger } from '@/shared/lib/logger';
+import {
+    isSlackSource,
+    SlackError,
+    type SlackFailure,
+    type SlackGuard,
+    type SlackSource,
+    slackFailure
+} from '@/shared/lib/slack';
+
+export interface RequestDestination {
+    tabId: number;
+    dispose(): Promise<void>;
+    finish(): void | Promise<void>;
+}
 
 interface ActiveRequest {
     requestId: string;
     applicationKey: string;
-    intendedAccount: string;
-    intendedOriginTab: number;
-    allowedReturnOrigins: readonly string[];
+    source: SlackSource | null;
     deadlineAt: number;
-    transportTimeoutTimer: ReturnType<typeof setTimeout> | null;
     deadlineTimer: ReturnType<typeof setTimeout> | null;
     state: RequestState;
     outcome: RequestOutcome | null;
     outcomeReason: string | null;
     startedAt: number;
     waitingSince: number | null;
-    listeners: Set<() => void>;
+    destination: RequestDestination | null;
+    destinationTabId: number | null;
+    cancelled: boolean;
+    invalidFailure: SlackFailure | null;
+    pendingOutcome: RequestOutcome | null;
+    pipeline: Promise<void> | null;
+    disposing: boolean;
 }
 
 let active: ActiveRequest | null = null;
@@ -50,95 +66,176 @@ const broadcast = (): void => {
 };
 
 const clearTimers = (req: ActiveRequest): void => {
-    if (req.transportTimeoutTimer) clearTimeout(req.transportTimeoutTimer);
-    if (req.deadlineTimer) clearTimeout(req.deadlineTimer);
-    req.transportTimeoutTimer = null;
-    req.deadlineTimer = null;
+    if (req.deadlineTimer) {
+        clearTimeout(req.deadlineTimer);
+        req.deadlineTimer = null;
+    }
 };
 
-const finalizeWith = (req: ActiveRequest, outcome: RequestOutcome, reason: string | null): void => {
+const requestIsTerminal = (req: ActiveRequest | null): boolean =>
+    req !== null &&
+    (req.state === REQUEST_STATE.SUCCEEDED || (req.state === REQUEST_STATE.IDLE && req.outcome !== null));
+
+const finalizeWith = (
+    req: ActiveRequest,
+    outcome: RequestOutcome | null,
+    reason: string | null,
+    state: RequestState
+): void => {
     clearTimers(req);
-    req.state = 'idle';
+    req.state = state;
     req.outcome = outcome;
     req.outcomeReason = reason;
-    // Do NOT null `active` — keep the snapshot so getRequestStatus can
-    // return the most-recent terminalized outcome until a new request starts.
+    req.pipeline = null;
+    req.disposing = false;
 };
-
-const isTerminal = (req: ActiveRequest | null): req is ActiveRequest =>
-    req !== null && req.state === 'idle' && req.outcome !== null;
 
 const buildActive = (params: {
     requestId: string;
     applicationKey: string;
-    intendedAccount: string;
-    intendedOriginTab: number;
-    allowedReturnOrigins: readonly string[];
+    source: SlackSource | null;
     state: RequestState;
     outcome: RequestOutcome | null;
     outcomeReason: string | null;
 }): ActiveRequest => ({
     requestId: params.requestId,
     applicationKey: params.applicationKey,
-    intendedAccount: params.intendedAccount,
-    intendedOriginTab: params.intendedOriginTab,
-    allowedReturnOrigins: params.allowedReturnOrigins,
+    source: params.source,
     deadlineAt: Date.now() + REQUEST_DEADLINE_MS,
-    transportTimeoutTimer: null,
     deadlineTimer: null,
     state: params.state,
     outcome: params.outcome,
     outcomeReason: params.outcomeReason,
     startedAt: Date.now(),
     waitingSince: null,
-    listeners: new Set()
+    destination: null,
+    destinationTabId: null,
+    cancelled: false,
+    invalidFailure: null,
+    pendingOutcome: null,
+    pipeline: null,
+    disposing: false
 });
+
+const armDeadline = (req: ActiveRequest): void => {
+    req.deadlineTimer = setTimeout(() => {
+        invalidateRequest('expired');
+    }, REQUEST_DEADLINE_MS);
+};
+
+const failureFromInvalid = (req: ActiveRequest): SlackFailure => {
+    if (req.invalidFailure) return req.invalidFailure;
+    if (req.cancelled) return 'cancelled';
+    if (Date.now() > req.deadlineAt) return 'expired';
+    return 'cancelled';
+};
+
+const outcomeForFailure = (failure: SlackFailure): RequestOutcome => {
+    if (failure === 'cancelled') return REQUEST_OUTCOME.CANCELLED;
+    if (failure === 'expired') return REQUEST_OUTCOME.EXPIRED;
+    if (failure === 'disconnected') return REQUEST_OUTCOME.DISCONNECTED;
+    if (failure === 'no_source' || failure === 'auth_required' || failure === 'sharing_not_approved') {
+        return REQUEST_OUTCOME.HOST_UNAVAILABLE;
+    }
+    if (failure === 'client_not_empty' || failure === 'scope_changed' || failure === 'unsupported_scope') {
+        return REQUEST_OUTCOME.ACCOUNT_MISMATCH;
+    }
+    return REQUEST_OUTCOME.FAILED;
+};
+
+const disposeAndFail = async (requestId: string, error: unknown): Promise<void> => {
+    const req = active;
+    if (!req || req.requestId !== requestId || req.state === REQUEST_STATE.SUCCEEDED || req.disposing) return;
+    req.disposing = true;
+    const dest = req.destination;
+    req.destination = null;
+    let cleanupFailed = false;
+    try {
+        if (dest) await dest.dispose();
+    } catch {
+        cleanupFailed = true;
+    }
+    if (active !== req || req.requestId !== requestId || requestIsTerminal(req)) return;
+    if (cleanupFailed) {
+        finalizeWith(req, REQUEST_OUTCOME.FAILED, 'cleanup_required', REQUEST_STATE.IDLE);
+        broadcast();
+        return;
+    }
+    const failure = slackFailure(error);
+    finalizeWith(
+        req,
+        req.pendingOutcome ?? outcomeForFailure(failure),
+        req.outcomeReason ?? failure,
+        REQUEST_STATE.IDLE
+    );
+    broadcast();
+};
+
+const markInvalid = (
+    req: ActiveRequest,
+    failure: SlackFailure,
+    outcome: RequestOutcome,
+    reason: string | null
+): void => {
+    req.cancelled = true;
+    req.invalidFailure = failure;
+    req.pendingOutcome = outcome;
+    req.outcomeReason = reason;
+    if (!req.pipeline && !req.destination) {
+        finalizeWith(req, outcome, reason, REQUEST_STATE.IDLE);
+        broadcast();
+        return;
+    }
+    if (!req.pipeline) {
+        void disposeAndFail(req.requestId, new SlackError(failure));
+    }
+};
 
 /** Begin a new request. Returns the new state, or rejects with the error kind. */
 export const startRequest = (params: {
     requestId: string;
     applicationKey: string;
-    intendedAccount: string;
-    intendedOriginTab: number;
-    allowedReturnOrigins: readonly string[];
+    source?: unknown;
+    sharedSessionConsent?: unknown;
 }): { ok: true; state: RequestState } | { ok: false; error: ErrorKind; reason?: string } => {
-    if (active && !isTerminal(active)) {
+    if (active !== null && !requestIsTerminal(active)) {
         return { ok: false, error: ERROR_KIND.DUPLICATE_REQUEST, reason: 'a request is already active' };
     }
 
-    // Application-key phase gate: until Phase 6/7/8 ships a supported
-    // contract for a given application, every controller returns
-    // REQUEST_NOT_SUPPORTED. This is the explicit Phase 4 contract:
-    // no generic credential/blob adapter, no stub controllers.
-    if (params.applicationKey === 'unspecified') {
+    if (params.applicationKey !== 'slack') {
+        const reason =
+            params.applicationKey === 'unspecified'
+                ? 'no application controller registered yet'
+                : 'unsupported application';
         active = buildActive({
             requestId: params.requestId,
             applicationKey: params.applicationKey,
-            intendedAccount: params.intendedAccount,
-            intendedOriginTab: params.intendedOriginTab,
-            allowedReturnOrigins: params.allowedReturnOrigins,
-            state: 'idle',
+            source: null,
+            state: REQUEST_STATE.IDLE,
             outcome: REQUEST_OUTCOME.UNSUPPORTED,
-            outcomeReason: 'no application controller registered yet'
+            outcomeReason: reason
         });
         broadcast();
         return {
             ok: false,
             error: ERROR_KIND.REQUEST_NOT_SUPPORTED,
-            reason: 'no controller for applicationKey=unspecified'
+            reason
         };
+    }
+
+    if (params.sharedSessionConsent !== true || !isSlackSource(params.source)) {
+        return { ok: false, error: ERROR_KIND.MALFORMED, reason: 'invalid_payload' };
     }
 
     active = buildActive({
         requestId: params.requestId,
         applicationKey: params.applicationKey,
-        intendedAccount: params.intendedAccount,
-        intendedOriginTab: params.intendedOriginTab,
-        allowedReturnOrigins: params.allowedReturnOrigins,
+        source: params.source,
         state: REQUEST_STATE.CHECKING_HOST,
         outcome: null,
         outcomeReason: null
     });
+    armDeadline(active);
     broadcast();
     return { ok: true, state: active.state };
 };
@@ -148,14 +245,13 @@ export const cancelRequest = (): { ok: true; outcome: 'cancelled' } | { ok: fals
     if (!active) {
         return { ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST };
     }
-    if (active.outcome === REQUEST_OUTCOME.CANCELLED) {
+    if (active.outcome === REQUEST_OUTCOME.CANCELLED && requestIsTerminal(active)) {
         return { ok: true, outcome: 'cancelled' };
     }
-    if (isTerminal(active)) {
+    if (requestIsTerminal(active)) {
         return { ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST };
     }
-    finalizeWith(active, REQUEST_OUTCOME.CANCELLED, null);
-    broadcast();
+    markInvalid(active, 'cancelled', REQUEST_OUTCOME.CANCELLED, null);
     return { ok: true, outcome: 'cancelled' };
 };
 
@@ -164,7 +260,7 @@ export const invalidateRequest = (
     reason: 'disconnected' | 'expired' | 'host_unavailable' | 'navigation',
     detail?: string
 ): void => {
-    if (!active || isTerminal(active)) {
+    if (!active || requestIsTerminal(active)) {
         return;
     }
     const map: Record<typeof reason, RequestOutcome> = {
@@ -173,11 +269,11 @@ export const invalidateRequest = (
         host_unavailable: REQUEST_OUTCOME.HOST_UNAVAILABLE,
         navigation: REQUEST_OUTCOME.CANCELLED
     };
-    finalizeWith(active, map[reason], detail ?? null);
-    broadcast();
+    const failure: SlackFailure =
+        reason === 'disconnected' ? 'disconnected' : reason === 'expired' ? 'expired' : 'cancelled';
+    markInvalid(active, failure, map[reason], detail ?? null);
 };
 
-/** Query current request status. Returns the most-recent terminal outcome if no active request is in flight. */
 export const getRequestStatus = (): {
     ok: true;
     requestId: string | null;
@@ -186,16 +282,18 @@ export const getRequestStatus = (): {
     since: number | null;
     error: ErrorKind | null;
     reason: string | null;
+    destinationTabId: number | null;
 } => {
     if (!active) {
         return {
             ok: true,
             requestId: null,
-            state: 'idle',
+            state: REQUEST_STATE.IDLE,
             outcome: null,
             since: null,
             error: null,
-            reason: null
+            reason: null,
+            destinationTabId: null
         };
     }
     return {
@@ -205,7 +303,8 @@ export const getRequestStatus = (): {
         outcome: active.outcome,
         since: active.startedAt,
         error: null,
-        reason: active.outcomeReason
+        reason: active.outcomeReason,
+        destinationTabId: active.destinationTabId
     };
 };
 
@@ -214,6 +313,84 @@ export const subscribe = (cb: () => void): (() => void) => {
     return () => {
         listeners.delete(cb);
     };
+};
+
+export const isRequestCurrent = (requestId: string): boolean =>
+    active !== null && active.requestId === requestId && !requestIsTerminal(active) && !active.cancelled;
+
+export const createRequestGuard =
+    (requestId: string): SlackGuard =>
+    () => {
+        const req = active;
+        if (!req || req.requestId !== requestId || requestIsTerminal(req) || req.cancelled) {
+            throw new SlackError(req && req.requestId === requestId ? failureFromInvalid(req) : 'cancelled');
+        }
+        if (Date.now() > req.deadlineAt) {
+            req.cancelled = true;
+            req.invalidFailure = 'expired';
+            throw new SlackError('expired');
+        }
+    };
+
+export const setRequestState = (requestId: string, state: RequestState): void => {
+    if (!active || active.requestId !== requestId || requestIsTerminal(active) || active.cancelled) return;
+    if (state === REQUEST_STATE.SUCCEEDED || state === REQUEST_STATE.IDLE) return;
+    active.state = state;
+    if (state === REQUEST_STATE.WAITING_FOR_USER) {
+        active.waitingSince = Date.now();
+    }
+    broadcast();
+};
+
+export const attachDestination = (requestId: string, destination: RequestDestination): void => {
+    if (!active || active.requestId !== requestId || requestIsTerminal(active) || active.cancelled) {
+        void destination.dispose();
+        return;
+    }
+    active.destination = destination;
+    active.destinationTabId = destination.tabId;
+    broadcast();
+};
+
+export const completeRequest = async (requestId: string): Promise<boolean> => {
+    const req = active;
+    if (!req || req.requestId !== requestId || requestIsTerminal(req) || req.cancelled) return false;
+    const dest = req.destination;
+    try {
+        if (dest) await dest.finish();
+    } catch {
+        return false;
+    }
+    if (active !== req || req.requestId !== requestId || requestIsTerminal(req) || req.cancelled) return false;
+    req.destination = null;
+    if (dest) req.destinationTabId = dest.tabId;
+    finalizeWith(req, null, null, REQUEST_STATE.SUCCEEDED);
+    broadcast();
+    return true;
+};
+
+export const runRequestPipeline = (requestId: string, work: () => Promise<void>): Promise<void> => {
+    const req = active;
+    if (!req || req.requestId !== requestId || requestIsTerminal(req)) {
+        return Promise.resolve();
+    }
+    const pipeline = (async () => {
+        try {
+            await work();
+            if (
+                isRequestCurrent(requestId) &&
+                active !== null &&
+                active.requestId === requestId &&
+                !requestIsTerminal(active)
+            ) {
+                await disposeAndFail(requestId, new SlackError('failed'));
+            }
+        } catch (error) {
+            await disposeAndFail(requestId, error);
+        }
+    })();
+    req.pipeline = pipeline;
+    return pipeline;
 };
 
 /** Visible for tests. */

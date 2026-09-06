@@ -3,7 +3,7 @@ status: accepted
 date: 2026-09-05
 subject: 2026-09-05.lan-login-handoff
 supersedes: null
-superseded_by: null
+superseded_by: 0002-hosted-pairing-rendezvous.md (signaling restriction only)
 related:
   - ../.context/2026-09-05.lan-login-handoff/plan-lan-login-handoff.md
   - ../.context/2026-09-05.lan-login-handoff/phase-2-extension-transport-gate.md
@@ -11,6 +11,8 @@ related:
 ---
 
 # ADR 0001: Extension-only transport — accepted path, Mac-vs-Linux discharge matrix, container-vs-bare-metal verdict
+
+The no-hosted-signaling restriction in D1 is superseded by [ADR 0002](0002-hosted-pairing-rendezvous.md). Direct WebRTC and the physical-network verification limits below remain applicable. Manual descriptor exchange in the original gate is historical, not the current setup procedure; see [browser pairing how-tos](../howto/README.md).
 
 ## Context
 

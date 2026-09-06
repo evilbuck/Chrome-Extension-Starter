@@ -30,6 +30,12 @@
     "type": "module"
   },
   "permissions": ["storage", "tabs", "offscreen"],
+  "host_permissions": ["https://beam-me-up-pairing.buck-f11.workers.dev/*"],
+  "optional_permissions": ["cookies", "scripting"],
+  "optional_host_permissions": ["https://slack.com/*", "https://app.slack.com/*"],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' https://beam-me-up-pairing.buck-f11.workers.dev wss://beam-me-up-pairing.buck-f11.workers.dev"
+  },
   "web_accessible_resources": [
     {
       "resources": ["icons/*", "css/*.css"],

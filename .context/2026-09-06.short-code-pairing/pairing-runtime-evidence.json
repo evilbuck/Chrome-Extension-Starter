@@ -1,0 +1,45 @@
+{
+  "status": "completed",
+  "date": "2026-09-06",
+  "subject": "2026-09-06.short-code-pairing",
+  "endpoint": "https://beam-me-up-pairing.buck-f11.workers.dev",
+  "deployment_version": "0676c8e7-7ab6-48f4-8ddd-28dca3c94d6c",
+  "cloudflare_account": "personal account, not PartyPix",
+  "runtime": "Two disposable real Chromium extension profiles on Linux against the deployed Worker",
+  "checks": {
+    "extension_vitest": {"files": 15, "passed": 187},
+    "worker_workerd_vitest": {"files": 2, "passed": 24},
+    "extension_typecheck": "passed",
+    "worker_generated_types_and_typecheck": "passed",
+    "production_build": "passed; dist rebuilt",
+    "biome": "passed, 66 files, zero errors and four advisory warnings after formatting",
+    "guardrails": "No guardrails.json — ran detected commands only (no coverage/complexity baseline). Run /b-init-guardrails to create a durable contract."
+  },
+  "live_scenarios": [
+    "Host generated five characters; client entered lowercase once",
+    "Client-only approval left Send echo disabled; mutual confirmation connected both",
+    "Actual direct WebRTC echo returned successfully",
+    "Closing and reopening both UIs retained the active connection",
+    "Extension reload retained public peer trust; both reconnected without a code into a fresh authorized connection epoch",
+    "Disconnect retained trust; subsequent reconnect and echo succeeded",
+    "Forget immediately cleared local authorization; remote reconnect was refused; the other member could also forget idempotently",
+    "A third browser could not claim a pending invitation",
+    "Manual rejection ended the attempt and the rejected code could not resurrect it",
+    "Invalid codes were refused; an actual two-minute hosted expiry was waited out and refused",
+    "Final rebuilt production extension repeated bilateral pairing, echo, and successful forget on both profiles"
+  ],
+  "security_regressions": "Code collision/reservation and expiry, mismatched or repeated confirmations, malformed/oversize input, pinned signatures and connection binding, proof replay, stale/cancelled attempts, offscreen sender/storage boundary and unauthorized application requests are covered by the passing suites.",
+  "visual_evidence": [
+    "connected-options.png",
+    "connected-options-narrow.png: 390px, no horizontal overflow",
+    "popup-pairing.png: 400px, no horizontal overflow"
+  ],
+  "limits": [
+    "No physical Mac/Linux or restrictive-network connectivity claim",
+    "Pairing proof used synthetic echo, not real Slack credentials",
+    "First key introduction trusts the hosted service; not PAKE",
+    "Direct WebRTC still requires LAN/tailnet reachability; no STUN/TURN relay added"
+  ],
+  "cleanup": "Test pair revoked, disposable profiles removed, browser harness stopped and throwaway scripts removed; original user browser untouched",
+  "commit_scope": "User explicitly selected integrated extension including required pre-existing Slack integration; older Outlook/compatibility research remains outside the commit"
+}

@@ -1,15 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+    ERROR_KIND,
+    type ErrorKind,
+    PAYLOAD_KIND,
+    PAYLOAD_RESPONSE_KIND,
+    PEER_MAX_BYTES,
+    ROLE,
+    type Role
+} from '@/shared/constants';
+import {
+    EnvelopeError,
     encodeDescriptor,
     encodePeerRequest,
     encodePeerResponse,
-    EnvelopeError,
     isPeerExpired,
     parseDescriptor,
     parseDescriptorAdopt,
     parsePeer
 } from '@/shared/lib/envelope';
-import { ERROR_KIND, PAYLOAD_KIND, ROLE, type ErrorKind, type Role } from '@/shared/constants';
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -102,10 +110,7 @@ describe('parseDescriptor', () => {
 
     it('rejects an oversized envelope', () => {
         const big = 'x'.repeat(33 * 1024);
-        expectKind(
-            () => parseDescriptor(big, { role: ROLE.HOST, connectionId: makeUuid() }),
-            ERROR_KIND.OVERSIZED
-        );
+        expectKind(() => parseDescriptor(big, { role: ROLE.HOST, connectionId: makeUuid() }), ERROR_KIND.OVERSIZED);
     });
 
     it('rejects unsupported version', () => {
@@ -166,10 +171,7 @@ describe('parseDescriptor', () => {
 
     it('rejects missing required fields', () => {
         const bad = JSON.stringify({ v: 1, role: 'host' });
-        expectKind(
-            () => parseDescriptor(bad, { role: ROLE.HOST, connectionId: makeUuid() }),
-            ERROR_KIND.MALFORMED
-        );
+        expectKind(() => parseDescriptor(bad, { role: ROLE.HOST, connectionId: makeUuid() }), ERROR_KIND.MALFORMED);
     });
 
     it('round-trips through encodeDescriptor', () => {
@@ -195,10 +197,7 @@ describe('parseDescriptorAdopt', () => {
             created: Date.now() - 10 * 60 * 1000,
             expires: Date.now() - 5 * 60 * 1000
         };
-        expectKind(
-            () => parseDescriptorAdopt(JSON.stringify(env), { role: ROLE.HOST }),
-            ERROR_KIND.EXPIRED
-        );
+        expectKind(() => parseDescriptorAdopt(JSON.stringify(env), { role: ROLE.HOST }), ERROR_KIND.EXPIRED);
     });
 });
 
@@ -238,10 +237,7 @@ describe('parsePeer (request)', () => {
     it('rejects wrong role', () => {
         const id = makeUuid();
         const env = { ...basePeerRequest(ROLE.HOST, id, makeUuid()) };
-        expectKind(
-            () => parsePeer(env, { role: ROLE.CLIENT, connectionId: id }),
-            ERROR_KIND.ROLE_MISMATCH
-        );
+        expectKind(() => parsePeer(env, { role: ROLE.CLIENT, connectionId: id }), ERROR_KIND.ROLE_MISMATCH);
     });
 
     it('rejects mismatched connectionId', () => {
@@ -259,10 +255,7 @@ describe('parsePeer (request)', () => {
             ...basePeerRequest(ROLE.HOST, id, makeUuid()),
             deadline: Date.now() - 1000
         };
-        expectKind(
-            () => parsePeer(env, { role: ROLE.HOST, connectionId: id }),
-            ERROR_KIND.EXPIRED
-        );
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.EXPIRED);
     });
 
     it('rejects unknown request payload kind', () => {
@@ -275,10 +268,7 @@ describe('parsePeer (request)', () => {
             deadline: Date.now() + 60_000,
             payload: { kind: 'mystery_kind', text: 'x' }
         };
-        expectKind(
-            () => parsePeer(env, { role: ROLE.HOST, connectionId: id }),
-            ERROR_KIND.MALFORMED
-        );
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
     });
 
     it('rejects echo with empty text', () => {
@@ -287,10 +277,7 @@ describe('parsePeer (request)', () => {
             ...basePeerRequest(ROLE.HOST, id, makeUuid()),
             payload: { kind: PAYLOAD_KIND.ECHO, text: '' }
         };
-        expectKind(
-            () => parsePeer(env, { role: ROLE.HOST, connectionId: id }),
-            ERROR_KIND.MALFORMED
-        );
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
     });
 });
 
@@ -324,10 +311,7 @@ describe('parsePeer (response)', () => {
             replyTo: makeUuid(),
             payload: { kind: 'echo_response', replyTo: makeUuid(), text: 'pong' }
         };
-        expectKind(
-            () => parsePeer(env, { role: ROLE.CLIENT, connectionId: id }),
-            ERROR_KIND.MALFORMED
-        );
+        expectKind(() => parsePeer(env, { role: ROLE.CLIENT, connectionId: id }), ERROR_KIND.MALFORMED);
     });
 });
 
@@ -373,7 +357,7 @@ describe('encode + decode round trip', () => {
         const reqId = makeUuid();
         const original = makeUuid();
         const env = encodePeerResponse(ROLE.CLIENT, id, reqId, 5000, {
-            kind: 'echo_response',
+            kind: PAYLOAD_RESPONSE_KIND.ECHO_RESPONSE,
             replyTo: original,
             text: 'pong'
         });
@@ -382,6 +366,115 @@ describe('encode + decode round trip', () => {
         expect(parsed.replyTo).toBe(original);
         const responsePayload = parsed.payload as { kind: 'echo_response'; replyTo: string; text: string };
         expect(responsePayload.text).toBe('pong');
+    });
+
+    it('encodePeerRequest slack_list → parsePeer', () => {
+        const id = makeUuid();
+        const reqId = makeUuid();
+        const env = encodePeerRequest(ROLE.CLIENT, id, reqId, 5000, { kind: PAYLOAD_KIND.SLACK_LIST });
+        const parsed = parsePeer(env, { role: ROLE.CLIENT, connectionId: id });
+        if ('replyTo' in parsed) throw new Error('expected request');
+        expect(parsed.payload.kind).toBe(PAYLOAD_KIND.SLACK_LIST);
+    });
+});
+
+describe('parsePeer (slack application variants)', () => {
+    const slackSource = {
+        sourceTabId: 1,
+        scopeId: 'E01234567',
+        workspaceId: 'T01234567',
+        userId: 'U01234567',
+        enterpriseOrigin: 'https://acme.enterprise.slack.com',
+        workspaceOrigin: 'https://acme.slack.com',
+        workspaceName: 'Acme'
+    };
+
+    it('rejects an invalid slack_capture source', () => {
+        const id = makeUuid();
+        const env = {
+            v: 1 as const,
+            role: ROLE.CLIENT,
+            connectionId: id,
+            requestId: makeUuid(),
+            deadline: Date.now() + 60_000,
+            payload: { kind: PAYLOAD_KIND.SLACK_CAPTURE, source: { sourceTabId: 1 } }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.CLIENT, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('rejects extra fields on slack_list', () => {
+        const id = makeUuid();
+        const env = {
+            v: 1 as const,
+            role: ROLE.CLIENT,
+            connectionId: id,
+            requestId: makeUuid(),
+            deadline: Date.now() + 60_000,
+            payload: { kind: PAYLOAD_KIND.SLACK_LIST, extra: true }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.CLIENT, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('rejects an invalid slack_session', () => {
+        const id = makeUuid();
+        const replyTo = makeUuid();
+        const env = {
+            v: 1 as const,
+            role: ROLE.HOST,
+            connectionId: id,
+            requestId: makeUuid(),
+            deadline: Date.now() + 60_000,
+            replyTo,
+            payload: {
+                kind: PAYLOAD_RESPONSE_KIND.SLACK_SESSION,
+                replyTo,
+                session: { source: slackSource, cookies: [], teams: [] }
+            }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('rejects a wrong-role slack_list envelope', () => {
+        const id = makeUuid();
+        const env = {
+            v: 1 as const,
+            role: ROLE.CLIENT,
+            connectionId: id,
+            requestId: makeUuid(),
+            deadline: Date.now() + 60_000,
+            payload: { kind: PAYLOAD_KIND.SLACK_LIST }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.ROLE_MISMATCH);
+    });
+
+    it('rejects an oversized peer message', () => {
+        const id = makeUuid();
+        const raw = `"${'x'.repeat(PEER_MAX_BYTES + 8)}"`;
+        expectKind(() => parsePeer(raw, { role: ROLE.CLIENT, connectionId: id }), ERROR_KIND.OVERSIZED);
+    });
+
+    it('accepts a well-formed slack_capture request', () => {
+        const id = makeUuid();
+        const env = encodePeerRequest(ROLE.CLIENT, id, makeUuid(), 5000, {
+            kind: PAYLOAD_KIND.SLACK_CAPTURE,
+            source: slackSource
+        });
+        const parsed = parsePeer(env, { role: ROLE.CLIENT, connectionId: id });
+        if ('replyTo' in parsed) throw new Error('expected request');
+        expect(parsed.payload.kind).toBe(PAYLOAD_KIND.SLACK_CAPTURE);
+    });
+
+    it('accepts slack_error responses', () => {
+        const id = makeUuid();
+        const replyTo = makeUuid();
+        const env = encodePeerResponse(ROLE.HOST, id, makeUuid(), 5000, {
+            kind: PAYLOAD_RESPONSE_KIND.SLACK_ERROR,
+            replyTo,
+            error: 'busy'
+        });
+        const parsed = parsePeer(env, { role: ROLE.HOST, connectionId: id });
+        if (!('replyTo' in parsed)) throw new Error('expected response');
+        expect(parsed.payload.kind).toBe(PAYLOAD_RESPONSE_KIND.SLACK_ERROR);
     });
 });
 

@@ -1,0 +1,39 @@
+{
+    "$schema": "./node_modules/wrangler/config-schema.json",
+    "name": "beam-me-up-pairing",
+    "main": "src/index.ts",
+    "account_id": "f115d75d1f251862143966e5f0bdc09a",
+    "compatibility_date": "2026-09-06",
+    "compatibility_flags": ["nodejs_compat"],
+    "workers_dev": true,
+    // Invitation and signaling payloads must never appear in automatic invocation logs.
+    "observability": {
+        "enabled": true,
+        "logs": {
+            "invocation_logs": false
+        }
+    },
+    "durable_objects": {
+        "bindings": [
+            { "name": "CODE_SLOT", "class_name": "CodeSlot" },
+            { "name": "PAIR_ROOM", "class_name": "PairRoom" }
+        ]
+    },
+    "migrations": [
+        {
+            "tag": "v1",
+            "new_sqlite_classes": ["CodeSlot", "PairRoom"]
+        }
+    ],
+    // Counters are per Cloudflare location, not globally consistent.
+    "ratelimits": [
+        {
+            "name": "PAIRING_RATE_LIMIT",
+            "namespace_id": "81101",
+            "simple": {
+                "limit": 30,
+                "period": 60
+            }
+        }
+    ]
+}

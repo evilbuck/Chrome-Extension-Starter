@@ -1,23 +1,35 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
     _resetForTest,
+    attachDestination,
     cancelRequest,
+    completeRequest,
+    createRequestGuard,
     getRequestStatus,
     invalidateRequest,
+    runRequestPipeline,
     startRequest,
     subscribe
 } from '@/background/request';
 import { ERROR_KIND, REQUEST_OUTCOME, REQUEST_STATE } from '@/shared/constants';
 
-const makeRequestId = (n: number): string =>
-    `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+const makeRequestId = (n: number): string => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
+
+const slackSource = {
+    sourceTabId: 1,
+    scopeId: 'E01234567',
+    workspaceId: 'T01234567',
+    userId: 'U01234567',
+    enterpriseOrigin: 'https://acme.enterprise.slack.com',
+    workspaceOrigin: 'https://acme.slack.com',
+    workspaceName: 'Acme'
+};
 
 const params = (n: number) => ({
     requestId: makeRequestId(n),
-    applicationKey: 'outlook-web',
-    intendedAccount: 'test@example.com',
-    intendedOriginTab: 1,
-    allowedReturnOrigins: ['https://outlook.office.com'] as const
+    applicationKey: 'slack',
+    source: slackSource,
+    sharedSessionConsent: true as const
 });
 
 let notified = 0;
@@ -36,7 +48,7 @@ afterEach(() => {
 });
 
 describe('startRequest', () => {
-    it('enters checking_host for a registered application', () => {
+    it('enters checking_host for slack', () => {
         const r = startRequest(params(1));
         expect(r.ok).toBe(true);
         if (r.ok) expect(r.state).toBe(REQUEST_STATE.CHECKING_HOST);
@@ -57,8 +69,26 @@ describe('startRequest', () => {
         expect(r.ok).toBe(false);
         if (!r.ok) {
             expect(r.error).toBe(ERROR_KIND.REQUEST_NOT_SUPPORTED);
-            expect(r.reason).toMatch(/no controller/i);
         }
+    });
+
+    it('rejects unsupported applications explicitly', () => {
+        const r = startRequest({ ...params(14), applicationKey: 'outlook-web' });
+        expect(r.ok).toBe(false);
+        if (!r.ok) {
+            expect(r.error).toBe(ERROR_KIND.REQUEST_NOT_SUPPORTED);
+        }
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.UNSUPPORTED);
+    });
+
+    it('rejects slack without an explicit source', () => {
+        const r = startRequest({
+            requestId: makeRequestId(15),
+            applicationKey: 'slack',
+            sharedSessionConsent: true
+        });
+        expect(r.ok).toBe(false);
+        if (!r.ok) expect(r.error).toBe(ERROR_KIND.MALFORMED);
     });
 
     it('emits a notification on state change', () => {
@@ -147,5 +177,72 @@ describe('subscribe/notify', () => {
         off();
         startRequest(params(13));
         expect(local).toBe(0);
+    });
+});
+
+describe('late cancel and cleanup', () => {
+    it('does not succeed after cancel', async () => {
+        startRequest(params(20));
+        const dest = { tabId: 9, dispose: vi.fn(async () => undefined), finish: vi.fn() };
+        attachDestination(makeRequestId(20), dest);
+        cancelRequest();
+        expect(await completeRequest(makeRequestId(20))).toBe(false);
+        expect(getRequestStatus().state).not.toBe(REQUEST_STATE.SUCCEEDED);
+        expect(dest.finish).not.toHaveBeenCalled();
+    });
+
+    it('ignores completeRequest for an unknown request', async () => {
+        expect(await completeRequest(makeRequestId(99))).toBe(false);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+    });
+
+    it('disposes destination when cancel has no in-flight pipeline', async () => {
+        startRequest(params(21));
+        const dest = { tabId: 4, dispose: vi.fn(async () => undefined), finish: vi.fn() };
+        attachDestination(makeRequestId(21), dest);
+        cancelRequest();
+        await vi.waitFor(() => expect(dest.dispose).toHaveBeenCalled());
+        expect(dest.finish).not.toHaveBeenCalled();
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.CANCELLED);
+    });
+
+    it('keeps busy and defers dispose while a provider pipeline is in flight', async () => {
+        startRequest(params(22));
+        const dest = { tabId: 5, dispose: vi.fn(async () => undefined), finish: vi.fn() };
+        attachDestination(makeRequestId(22), dest);
+        let release: () => void = () => undefined;
+        const blocked = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const pipeline = runRequestPipeline(makeRequestId(22), async () => {
+            await blocked;
+            createRequestGuard(makeRequestId(22))();
+        });
+        cancelRequest();
+        expect(dest.dispose).not.toHaveBeenCalled();
+        expect(getRequestStatus().state).not.toBe(REQUEST_STATE.IDLE);
+        release();
+        await pipeline;
+        expect(dest.dispose).toHaveBeenCalled();
+        expect(dest.finish).not.toHaveBeenCalled();
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.CANCELLED);
+    });
+
+    it('publishes cleanup_required when destination.dispose throws', async () => {
+        startRequest(params(23));
+        const dest = {
+            tabId: 6,
+            dispose: vi.fn(async () => {
+                throw new Error('cookie remove failed');
+            }),
+            finish: vi.fn()
+        };
+        attachDestination(makeRequestId(23), dest);
+        cancelRequest();
+        await vi.waitFor(() => expect(getRequestStatus().reason).toBe('cleanup_required'));
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.FAILED);
+        expect(getRequestStatus().reason).not.toBe('cancelled');
     });
 });
