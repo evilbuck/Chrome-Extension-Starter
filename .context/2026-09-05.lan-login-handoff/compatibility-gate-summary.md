@@ -1,5 +1,5 @@
 ---
-status: pending
+status: active
 date: 2026-09-05
 phase: 3
 owner: orchestrator
@@ -19,20 +19,14 @@ memory:
 
 # Application Compatibility Gate — Summary
 
-> **All six verdicts are unresolved today.** No live-browser observation has
-> occurred in this session. The verdict set the plan allows is
-> `[supported, unsupported, unresolved]`. With zero observations recorded,
-> every row is `unresolved` — not `supported`, not `unsupported`, not
-> `conditional supported` (which is not in the allowed set). The previous
-> version of this file claimed "conditional supported" for every cell;
-> that label was an overreach and has been replaced.
+> **All six full-case verdicts remain unresolved.** Slack Case 2 now has a verified local mechanism and a successful two-profile extension WebRTC handoff, including client reload/account checks and original-host preservation; physical Mac/Linux is still unverified. Outlook's real-account probe stopped at Microsoft authentication and remains paused. Zoom has no live compatibility proof. See [Slack evidence](slack-session-transport-experiment.json) and [the Outlook report](research-outlook-session-transport.md).
 
 ## Verdict matrix
 
 | Application | Case 1 (host has no session → establish via app→Okta→app) | Case 2 (reuse existing host session) |
 |---|---|---|
-| Outlook on the web (`outlook.office.com`, `outlook.office365.com`) | unresolved | unresolved |
-| Slack web (`app.slack.com`) | unresolved | unresolved |
+| Outlook on the web (`outlook.office.com`, `outlook.office365.com`, `outlook.cloud.microsoft`) | unresolved | unresolved — stopped at authentication boundary |
+| Slack web (`app.slack.com`) | unresolved | unresolved cross-machine — local extension transfer passed |
 | Zoom Workplace Web App (`app.zoom.us/wc`) | unresolved | unresolved |
 
 ## Why every cell is unresolved
@@ -62,20 +56,16 @@ This summary and its per-application records ([compatibility-outlook.md](compati
 contain:
 
 - Cited public-doc constraints (sourced from the existing research notes).
-- General candidate state categories (cookies, origin storage, refresh
-  token) without naming specific cookie names or values.
-- Manifest state (the current manifest has no `cookies` permission).
-- Unsupported boundary categories (tenant policy, device-bound factors,
-  out-of-scope surfaces) without claiming specific cookie names.
+- Actual non-secret state observations from bounded Outlook and Slack probes.
+- Slack's optional cookies/scripting and exact host permissions, with explicit shared-session consent.
+- Unsupported boundaries, including tenant/device policy and unobserved account shapes; no invented state names.
 - Live-browser rows the user must fill before any verdict can move to
   `supported` or `unsupported`.
 
 This record does NOT contain:
 
-- Specific cookie names, header values, or JWT claim names. Those would
-  be invented from public docs without observation and the plan's risk
-  section explicitly forbids invented values.
-- Behavior claims attributed to "observed" when no observation has occurred.
+- Credential values, raw HAR/profile exports, or invented cookie/storage names.
+- A claim that the stopped Outlook probe established authenticated client identity, mandatory MFA, or universal incompatibility.
 - Generic adapter / stub contracts. Phase 3's phase file explicitly
   forbids them: "Unsupported requirements remain visible; the parent plan
   cannot complete." A `unresolved` row does not authorize a stub Phase 6/7/8.
@@ -86,12 +76,13 @@ Phase 4 (Scoped Control Cutover) depends on `[2, 3]` per the plan. With
 Phase 3's six verdicts at `unresolved`, Phase 4's design constraint is
 "the control plane must support an application payload that is
 application-specific and may be `unsupported` for one or more providers".
-This is compatible with the discriminated peer payload contract already
-implemented in Phase 2; no contract changes are required.
+Slack now extends the discriminated peer payload contract with bounded,
+application-specific requests and replies. Other applications remain unsupported.
 
-Phase 5 (Host Application Preparation) and Phase 6/7/8 (per-app controllers)
-require `supported` Phase 3 verdicts to begin implementation per the parent
-plan. They remain gated on the live-browser observation rows below.
+The user selected Slack ahead of Outlook. Its exact, explicitly permitted local
+mechanism was verified before implementing the Phase 7 controller. This does not
+close the physical-pair acceptance gates or justify generic export adapters for
+unobserved applications/account shapes.
 
 ## Live-browser rows (user must complete to resolve any verdict)
 
@@ -104,15 +95,8 @@ plan. They remain gated on the live-browser observation rows below.
 
 ## Non-secret discipline
 
-This gate and its per-application records contain no token values, no HAR
-exports, no profile dumps, no specific cookie names, and no behavior
-claims attributed to observation. The cookie-name lists and JWT-claim
-names that earlier drafts of this file contained were removed because they
-were inferred from public docs without observation, which the plan
-explicitly forbids.
+No token or cookie values, raw authenticated traffic exports, or profile dumps are retained. Outlook cookie/cache names are now backed by direct observations, not inference. Source-derived constraints remain distinct from measured behavior.
 
 ## Decision recorded by this evidence
 
-Phase 3 status: `pending`. All six verdicts: `unresolved`. Phases 6/7/8 are
-not authorized to begin. Phase 4 (which does not require supported
-verdicts) can begin independently.
+Phase 3 remains active. Slack's existing-session local controller and real two-profile transfer are verified; physical Mac/Linux and Case 1 remain open. Outlook is paused and Zoom is untested. The local Slack result is not evidence for either other provider. Detailed scope, checks, review and remaining limits are in `slack-integration-plan.json`.

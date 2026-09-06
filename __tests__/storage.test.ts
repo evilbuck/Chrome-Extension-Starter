@@ -138,4 +138,21 @@ describe('createTypedStorage', () => {
             expect(mockStorageAreas.local.set).toHaveBeenCalled();
         });
     });
+
+    describe('session area', () => {
+        it('reads and writes chrome.storage.session', async () => {
+            mockStorageAreas.session.set.mockImplementation((_items, cb) => cb());
+            mockStorageAreas.session.get.mockImplementation((_d, cb) =>
+                chromeGetImpl(_d, { activeRequestId: 'req-1' }, cb)
+            );
+            await kv.set('session', 'activeRequestId', 'req-1');
+            expect(mockStorageAreas.session.set).toHaveBeenCalledWith(
+                { activeRequestId: 'req-1' },
+                expect.any(Function)
+            );
+            expect(mockStorageAreas.local.set).not.toHaveBeenCalled();
+            await expect(kv.get('session', 'activeRequestId', null)).resolves.toBe('req-1');
+            expect(mockStorageAreas.session.get).toHaveBeenCalled();
+        });
+    });
 });

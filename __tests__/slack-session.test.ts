@@ -1,7 +1,22 @@
 import { webcrypto } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applySlackSession, prepareSlackDestination } from '@/background/apps/slack';
-import { isSlackSession, SLACK_STAGING_URL, SlackError, type SlackSession } from '@/shared/lib/slack';
+import {
+    applySlackSession,
+    captureSlackSession,
+    listSlackSources,
+    prepareSlackDestination,
+    verifySlackHost
+} from '@/background/apps/slack';
+import {
+    isSlackSession,
+    isSlackSource,
+    SLACK_ORIGIN,
+    SLACK_STAGING_URL,
+    SlackError,
+    type SlackSession,
+    type SlackSource,
+    sameSlackSource
+} from '@/shared/lib/slack';
 
 const bundle = (): SlackSession => ({
     source: {
@@ -69,6 +84,45 @@ describe('Slack session boundary', () => {
         delete session.cookies[0].expirationDate;
         session.cookies[1] = { ...session.cookies[0] };
         expect(isSlackSession(session)).toBe(false);
+    });
+
+    it('rejects enterprise and workspace origins that are not parseable URLs', () => {
+        const source = bundle().source;
+        expect(isSlackSource({ ...source, enterpriseOrigin: 'https://[' })).toBe(false);
+        expect(isSlackSource({ ...source, workspaceOrigin: 'https://[' })).toBe(false);
+    });
+
+    it('treats sources as the same only when the host tab also matches', () => {
+        const source = bundle().source;
+        expect(sameSlackSource(source, { ...source })).toBe(true);
+        expect(sameSlackSource(source, { ...source, sourceTabId: source.sourceTabId + 1 })).toBe(false);
+    });
+
+    it('rejects teams with extra keys, missing identity, or a non-boolean unified-client flag', () => {
+        const extra = bundle();
+        Object.assign(extra.teams[0], { extra: 'nope' });
+        expect(isSlackSession(extra)).toBe(false);
+        const missing = bundle();
+        delete (missing.teams[0] as { name?: string }).name;
+        expect(isSlackSession(missing)).toBe(false);
+        const emptyName = bundle();
+        emptyName.teams[0].name = '';
+        expect(isSlackSession(emptyName)).toBe(false);
+        const emptyToken = bundle();
+        emptyToken.teams[0].token = '';
+        expect(isSlackSession(emptyToken)).toBe(false);
+        const flag = bundle();
+        Object.assign(flag.teams[0], { is_unified_user_client_enabled: 'yes' });
+        expect(isSlackSession(flag)).toBe(false);
+    });
+
+    it('rejects team URLs that do not match the declared origins or cannot be parsed', () => {
+        const mismatched = bundle();
+        mismatched.teams[1].url = 'https://other.slack.com/';
+        expect(isSlackSession(mismatched)).toBe(false);
+        const unparseable = bundle();
+        unparseable.teams[0].url = 'not a url';
+        expect(isSlackSession(unparseable)).toBe(false);
     });
 });
 
@@ -139,9 +193,62 @@ const browserFixture = (existing = false) => {
             })
         }
     };
-    vi.stubGlobal('chrome', { permissions: { contains: vi.fn(async () => true) }, tabs, cookies, scripting, storage });
-    return { cookieJar, openTabs, cookies, tabs, scripting, storage };
+    const permissions = { contains: vi.fn(async () => true) };
+    vi.stubGlobal('chrome', { permissions, tabs, cookies, scripting, storage });
+    return { cookieJar, openTabs, cookies, tabs, scripting, storage, permissions };
 };
+
+const hostTab = (source: SlackSource = bundle().source) => ({
+    id: source.sourceTabId,
+    url: `${SLACK_ORIGIN}/client/${source.scopeId}`,
+    incognito: false
+});
+
+const installHostPage = (session: SlackSession = bundle()) => {
+    vi.stubGlobal('location', {
+        origin: SLACK_ORIGIN,
+        href: `${SLACK_ORIGIN}/client/${session.source.scopeId}`,
+        pathname: `/client/${session.source.scopeId}`
+    });
+    vi.stubGlobal('document', {
+        contentType: 'text/html',
+        querySelector: (selector: string) => {
+            if (selector.includes('password') || selector.includes('one-time-code') || selector.includes('signin')) {
+                return null;
+            }
+            return selector.includes('p-client_workspace') ||
+                selector.includes('workspace_switcher') ||
+                selector.includes('team-menu')
+                ? {}
+                : null;
+        }
+    });
+    localStorage.setItem(
+        'localConfig_v2',
+        JSON.stringify({
+            teams: Object.fromEntries(session.teams.map((team) => [team.id, team])),
+            orderedTeamIds: [session.source.scopeId],
+            lastActiveTeamId: session.source.scopeId
+        })
+    );
+    vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => ({
+            json: async () => ({ ok: true, team_id: session.source.workspaceId, user_id: session.source.userId })
+        }))
+    );
+};
+
+const authCookies = (session: SlackSession = bundle()) =>
+    session.cookies.map((cookie) => ({
+        name: cookie.name,
+        value: cookie.value,
+        domain: '.slack.com',
+        path: '/',
+        httpOnly: true,
+        secure: true,
+        session: true
+    }));
 
 const interruptAfterConfigWrite = async () => {
     const browser = browserFixture();
@@ -275,5 +382,176 @@ describe('Slack destination ownership', () => {
         expect(browser.cookieJar.size).toBe(0);
         expect(browser.openTabs.has(destination.tabId)).toBe(true);
         await destination.dispose();
+    });
+});
+
+describe('Slack source listing and capture', () => {
+    it('returns no sources when no Slack client tabs are open', async () => {
+        browserFixture();
+        await expect(listSlackSources(() => {})).resolves.toEqual([]);
+    });
+
+    it('refuses to inspect Slack when the permission is missing', async () => {
+        const browser = browserFixture();
+        browser.permissions.contains.mockResolvedValue(false);
+        await expect(listSlackSources(() => {})).rejects.toMatchObject({ code: 'permission_denied' });
+        await expect(verifySlackHost(bundle().source, () => {})).rejects.toMatchObject({
+            code: 'permission_denied'
+        });
+        await expect(captureSlackSession(bundle().source, () => {})).rejects.toMatchObject({
+            code: 'permission_denied'
+        });
+    });
+
+    it('lists a signed-in Slack client tab and skips tabs that cannot be inspected', async () => {
+        const browser = browserFixture();
+        const session = bundle();
+        installHostPage(session);
+        const tab = hostTab(session.source);
+        browser.tabs.query.mockResolvedValue([
+            { url: tab.url },
+            { id: 9, url: tab.url, incognito: true },
+            tab,
+            { id: 8, url: tab.url, incognito: false }
+        ]);
+        browser.tabs.get.mockImplementation(async (id: number) => ({ ...tab, id }));
+        browser.scripting.executeScript.mockImplementation(async ({ args = [] }) => {
+            if (args[1] === tab.id) return [{ result: { ok: true, source: session.source } }];
+            if (args[1] === 8) return [{ result: null }];
+            return [{ result: { ok: true, source: { sourceTabId: args[1] } } }];
+        });
+        await expect(listSlackSources(() => {})).resolves.toEqual([session.source]);
+    });
+
+    it('surfaces auth_required when every Slack tab fails inspection', async () => {
+        const browser = browserFixture();
+        const tab = hostTab();
+        browser.tabs.query.mockResolvedValue([tab]);
+        browser.tabs.get.mockResolvedValue(tab);
+        browser.scripting.executeScript.mockResolvedValue([{ result: { ok: false, error: 'auth_required' } }]);
+        await expect(listSlackSources(() => {})).rejects.toMatchObject({ code: 'auth_required' });
+    });
+
+    it('reads a live grid client as a source without mocking the inspect script', async () => {
+        const browser = browserFixture();
+        const session = bundle();
+        installHostPage(session);
+        const tab = hostTab(session.source);
+        browser.tabs.query.mockResolvedValue([tab]);
+        browser.tabs.get.mockResolvedValue(tab);
+        await expect(listSlackSources(() => {})).resolves.toEqual([session.source]);
+        await expect(verifySlackHost(session.source, () => {})).resolves.toBeUndefined();
+    });
+
+    it('rejects a host whose workspace or user no longer matches the source', async () => {
+        const browser = browserFixture();
+        const session = bundle();
+        installHostPage(session);
+        browser.tabs.get.mockResolvedValue(hostTab(session.source));
+        await expect(
+            verifySlackHost({ ...session.source, workspaceId: 'T9999999999', userId: 'U9999999999' }, () => {})
+        ).rejects.toMatchObject({ code: 'scope_changed' });
+    });
+
+    it('rejects a missing or non-Slack source tab', async () => {
+        const browser = browserFixture();
+        browser.tabs.get.mockRejectedValue(new Error('No tab with id'));
+        await expect(verifySlackHost(bundle().source, () => {})).rejects.toThrow('No tab with id');
+        browser.tabs.get.mockResolvedValue({ id: 4, url: 'https://example.com', incognito: false });
+        await expect(verifySlackHost(bundle().source, () => {})).rejects.toMatchObject({ code: 'scope_changed' });
+        await expect(verifySlackHost({} as SlackSource, () => {})).rejects.toMatchObject({
+            code: 'invalid_payload'
+        });
+    });
+
+    it('captures cookies and teams from a signed-in Slack tab', async () => {
+        const browser = browserFixture();
+        const session = bundle();
+        installHostPage(session);
+        browser.tabs.get.mockResolvedValue(hostTab(session.source));
+        browser.cookies.getAll.mockResolvedValue(authCookies(session));
+        await expect(captureSlackSession(session.source, () => {})).resolves.toEqual({
+            source: session.source,
+            teams: session.teams,
+            cookies: session.cookies
+        });
+    });
+
+    it('does not capture a session when Slack still requires authentication', async () => {
+        const browser = browserFixture();
+        const session = bundle();
+        installHostPage(session);
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(async () => ({ json: async () => ({ ok: false }) }))
+        );
+        browser.tabs.get.mockResolvedValue(hostTab(session.source));
+        await expect(captureSlackSession(session.source, () => {})).rejects.toMatchObject({
+            code: 'auth_required'
+        });
+    });
+
+    it('rejects a capture whose cookies are not a Slack session', async () => {
+        const browser = browserFixture();
+        const session = bundle();
+        installHostPage(session);
+        browser.tabs.get.mockResolvedValue(hostTab(session.source));
+        browser.cookies.getAll.mockResolvedValue([
+            {
+                name: 'd',
+                value: 'synthetic-cookie',
+                domain: 'evil.example',
+                path: '/',
+                httpOnly: true,
+                secure: true,
+                session: true
+            }
+        ]);
+        await expect(captureSlackSession(session.source, () => {})).rejects.toMatchObject({
+            code: 'unsupported_scope'
+        });
+    });
+});
+
+describe('Slack destination failure recovery', () => {
+    it('aborts install when Slack refuses the cookie write', async () => {
+        const browser = browserFixture();
+        const destination = await prepareSlackDestination(() => {});
+        browser.cookies.set.mockResolvedValue(undefined);
+        await expect(applySlackSession(destination, bundle(), () => {})).rejects.toMatchObject({
+            code: 'permission_denied'
+        });
+        await destination.dispose();
+        expect(browser.openTabs.size).toBe(0);
+    });
+
+    it('aborts install when the destination tab is closed after prepare', async () => {
+        const browser = browserFixture();
+        const destination = await prepareSlackDestination(() => {});
+        const onRemoved = browser.tabs.onRemoved.addListener.mock.calls[0][0] as (id: number) => void;
+        onRemoved(destination.tabId);
+        await expect(applySlackSession(destination, bundle(), () => {})).rejects.toMatchObject({
+            code: 'scope_changed'
+        });
+        await destination.dispose();
+    });
+
+    it('refuses new work when a crashed destination journal cannot be cleaned', async () => {
+        const browser = browserFixture();
+        await browser.storage.session.set({
+            slackPendingDestination: {
+                tabId: 3,
+                nonce: 'dead-nonce',
+                cookiesTouched: true,
+                configTouched: false,
+                ownership: null
+            }
+        });
+        vi.resetModules();
+        const slack = await import('@/background/apps/slack');
+        await expect(slack.prepareSlackDestination(() => {})).rejects.toMatchObject({
+            code: 'cleanup_required'
+        });
+        expect(browser.openTabs.size).toBe(0);
     });
 });

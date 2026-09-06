@@ -6,9 +6,8 @@ topics: [chrome-extension, authentication, lan, tailscale, web-rtc, session-port
 research: [research-auth-compatibility.md, research-extension-transport.md, research-zoom-compatibility.md]
 iterations: []
 spec: null
-memory: [lan-login-handoff-planning-2026-09-05.md, lan-login-handoff-phasing-2026-09-05.md, lan-login-handoff-implementation-2026-09-05.md]
+memory: [lan-login-handoff-planning-2026-09-05.md, lan-login-handoff-phasing-2026-09-05.md, lan-login-handoff-implementation-2026-09-05.md, ../memory/lan-login-handoff-2026-09-06.md]
 ---
-
 # Plan: Development-only host-controlled application authentication
 
 ## User Goal

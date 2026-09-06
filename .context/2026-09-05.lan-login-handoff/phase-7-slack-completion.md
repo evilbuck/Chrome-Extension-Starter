@@ -1,5 +1,5 @@
 ---
-status: pending
+status: active
 phase: 7
 order: 7
 plan: plan-lan-login-handoff.md
@@ -12,20 +12,26 @@ omp_execution: none
 files:
   - public/manifest.json
   - src/background/apps/slack.ts
-  - src/background/sync.ts
+  - src/background/connection.ts
+  - src/background/request.ts
+  - src/offscreen/index.ts
+  - src/shared/lib/slack.ts
+  - src/shared/lib/envelope.ts
+  - src/shared/constants.ts
+  - src/pages/slack/request-panel.tsx
   - src/pages/popup/index.tsx
   - src/pages/options/index.tsx
-  - __tests__/slack.test.ts
+  - __tests__/slack-session.test.ts
 from_plan_steps: [6, 7]
 depends_on: [6]
 dependency_type: HARD
 acceptance_criteria:
   - "[ ] The Slack controller maps exactly to the supported Phase 3 contract; unresolved/unsupported evidence leaves this phase open and creates no stub."
-  - "[ ] Only Slack-workspace-specific origins and optional permissions required by the contract are added; no broad Slack/Okta/profile access."
+  - "[x] Only the observed Slack origins and optional permissions are added; shared Slack/Enterprise Grid scope was explicitly authorized, without Okta or general profile export."
   - "[ ] Case 2 reuses the exact host Slack workspace/account; Case 1 uses normal host app-to-Okta sign-in with explicit human pauses; both converge on one client path."
-  - "[ ] Completion applies only to the original intended client tab/workspace/account after all scope and lifecycle checks."
+  - "[x] Completion applies only to the request-owned client tab and explicitly selected workspace/account after scope and lifecycle checks."
   - "[ ] The authenticated Slack web workspace/account after Linux refresh/navigation and continued macOS host access are observed before success; no message is sent."
-  - "[ ] Auth state remains bounded in memory/transit and never enters durable storage, logs, generic errors or artifacts."
+  - "[x] Replayable auth state remains in bounded memory/transit and intended Slack site storage; it never enters extension storage, logs, generic errors or artifacts."
   - "[ ] Wrong workspace/account/tab, permission denial, expiry, cancel, disconnect and required device interaction cause no unintended action."
 completed_at: null
 completed_by: null
@@ -43,6 +49,25 @@ memory:
 Inherited user goal (from [plan-lan-login-handoff.md](plan-lan-login-handoff.md)): enable one person to use Microsoft 365, Zoom and Slack web applications from another computer they own on a shared tailnet or internal LAN without repeated lengthy login/logout flows, using either the host's existing Okta authentication or its existing session in the requested application, while the host remains logged in.
 
 This provider-specific vertical slice follows Outlook because both integrate through shared manifest/registry/UI files; sequencing avoids concurrent ownership. It otherwise uses the same proven transport, Phase 3 contract, scoped control and common host preparation. If Slack compatibility remains unsupported/unresolved, keep the requirement open and do not substitute ordinary client login or an adapter stub.
+
+Sequencing override (2026-09-06): the user paused Outlook and selected Slack next, authorizing their real workspace with stop-on-authentication/device-check boundaries and no messages, reactions, or workspace changes. The prior Phase 6 ordering does not block Slack investigation; shared control prerequisites and the evidence gate still apply. No Outlook acceptance criterion is implied complete.
+
+Local implementation checkpoint: the real existing-session contract passed both
+a bounded probe and actual extension WebRTC transfer between isolated Linux
+profiles. The user approved shared Slack/Enterprise Grid credentials and optional
+permissions. This supports the implemented exact account shape, but does not
+close the physical Mac/Linux or Case 1 acceptance rows. Outlook remains paused;
+its re-smoke is not authorized by the Slack continuation.
+
+Source review found and fixed interrupted-cleanup ownership: later logins are
+preserved using non-secret ownership fingerprints. The replacement-cookie
+regression failed before the fix. Final unit gate: 160 tests in 11 files; production
+build/type checker passed. Actual local identity and host-preservation evidence
+is recorded in `slack-session-transport-experiment.json`.
+
+Known separate lifecycle follow-up: service-worker suspension loses terminal
+request display state, although the transferred Slack tab stays authenticated.
+Do not imply cross-machine or complete failure-matrix coverage from local success.
 
 ## Implementation Details
 
@@ -76,4 +101,4 @@ If executing this phase inside an OMP execution session:
 3. If review creates an `iterate-*.md` artifact (in-plan issues), run `/b-iterate`, then re-run `/b-review`. Out-of-plan issues use a separate `/b-plan` → `/b-build`; they do not block this phase. If review flags documentation impact, run `/b-docs` before `/b-save`.
 4. Run `/b-save`.
 5. Run `/b-commit`; one phase completion equals one commit.
-6. If incomplete, leave `status: in-progress` for resume.
+6. If incomplete, leave `status: active` for resume.

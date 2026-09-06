@@ -1,0 +1,16 @@
+{
+  "status": "completed",
+  "date": "2026-09-05",
+  "scope": "Disposable Microsoft 365 tenant for Outlook compatibility testing. No signup, purchase, or real-account access performed.",
+  "accountBoundary": "User confirmed outlook.live.com is disposable test account; outlook.office365.com is real account and remains outside experiment scope.",
+  "recommendation": "Microsoft 365 Business Basic 30-day trial in a brand-new tenant. Includes business mailbox and web Outlook; use provided onmicrosoft.com domain for initial existing-session test. Create a licensed non-admin test user. Do not add a subscription to the real employer tenant.",
+  "billing": "Credit card required. Trial automatically converts to paid subscription; Microsoft Learn states annual term by default. Turn off recurring billing in Billing > Your products before expiry; official docs say trial remains until month end without charge.",
+  "freeAlternative": "Microsoft 365 E5 developer sandbox is free only for eligible members, including qualifying Visual Studio Professional/Enterprise subscribers and qualifying partner/support customers; not universally available to all developers. Includes Exchange Online and test users.",
+  "limits": "Trial tenant does not reproduce real employer policies or supply Okta federation automatically. It enables initial Outlook Case 2 investigation, not proof of Okta-backed Case 1 or real-tenant compatibility.",
+  "sources": [
+    "https://www.microsoft.com/en-us/microsoft-365/business/microsoft-365-business-basic",
+    "https://www.microsoft.com/en-us/microsoft-365/business/microsoft-365-business-standard-one-month-trial",
+    "https://learn.microsoft.com/en-us/microsoft-365/commerce/try-or-buy-microsoft-365?view=o365-worldwide",
+    "https://learn.microsoft.com/en-us/office/developer-program/microsoft-365-developer-program-faq"
+  ]
+}

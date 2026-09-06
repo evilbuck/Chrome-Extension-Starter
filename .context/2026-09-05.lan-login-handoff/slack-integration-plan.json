@@ -1,0 +1,48 @@
+{
+  "status": "completed",
+  "date": "2026-09-06",
+  "goal": "Transfer the observed existing Slack Enterprise Grid session over the extension's established peer channel, preserving the host and verifying the selected account/workspace after client reload.",
+  "completionScope": "Implementation and real same-machine two-profile extension proof. The parent Phase 7 remains active for physical Mac/Linux, Case 1, and the complete failure matrix.",
+  "authorization": "User explicitly authorized shared Slack session credentials despite unproven workspace-only isolation and approved optional extension permissions. No IdP state, messages, reactions, workspace mutations, or auth/device-check bypass. Outlook remains paused.",
+  "supportedScope": "Observed Enterprise Grid plus one bound member workspace/user; other shapes fail closed. The client must have no existing Slack session.",
+  "steps": [
+    {"step":"Exact typed state and browser capture/install/identity controller","status":"completed","evidence":"src/shared/lib/slack.ts and src/background/apps/slack.ts; real client identity/reload and original-host preservation verified"},
+    {"step":"Correlated peer protocol and worker request lifecycle","status":"completed","evidence":"Actual WebRTC transfer reached succeeded in two isolated Chromium profiles; connection/deadline/source guards and sanitized status reviewed"},
+    {"step":"Permission, shared-session consent, source selection and cancellation UI","status":"completed","evidence":"Actual user permission approval and UI-initiated transfer; desktop options and 420px popup visually checked"},
+    {"step":"Deterministic checks and actual reviewed-build runtime smoke","status":"completed","evidence":"160 tests in 11 files; production build/type checker; reviewed build again reached succeeded over WebRTC"}
+  ],
+  "boundaries": [
+    "Optional cookies/scripting and exact slack.com and app.slack.com hosts only",
+    "Minimal d/d-s cookies and two localConfig_v2 entries; inert same-origin staging before app navigation",
+    "Source identity, client identity after reload, and host identity recheck before success",
+    "Request/connection/deadline/source guards; cleanup awaited before accepting another request",
+    "Session-only salted ownership fingerprints permit cleanup without persisting replayable credentials; conflicts preserve newer logins",
+    "No generic credential adapter, IdP state, application content or Outlook changes"
+  ],
+  "verification": {
+    "contract": "ephemeral",
+    "unitCommand": "./node_modules/.bin/vitest run",
+    "testFiles": 11,
+    "testsPassed": 160,
+    "buildCommand": "./node_modules/.bin/rsbuild build --mode=production",
+    "buildAndTypeCheck": "passed",
+    "biome": "passed on changed source and regression fixture files",
+    "durableGuardrails": false,
+    "coverageComplexity": "not measured; no durable baseline",
+    "extensionTransportUsed": true,
+    "crossProfile": true,
+    "crossMachine": false
+  },
+  "review": {
+    "verdict": "pass with documented scope limits",
+    "providerFinding": "Replacement-login cleanup deletion reproduced by a failing regression, fixed with ownership checks, then source-reviewed as resolved",
+    "transportFindings": [],
+    "remainingBlockingFindings": []
+  },
+  "remainingLimits": [
+    "Physical macOS-to-Linux validation and normal host-sign-in starting case remain open",
+    "Terminal request display state resets after service-worker suspension; the transferred app session remains valid",
+    "Cookie APIs have no atomic compare-and-delete; concurrent manual Slack sign-ins are outside the PoC operating boundary",
+    "Run /b-init-guardrails to establish durable lint/test/coverage/complexity gates"
+  ]
+}

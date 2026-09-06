@@ -7,11 +7,14 @@ import {
     createRequestGuard,
     getRequestStatus,
     invalidateRequest,
+    isRequestCurrent,
     runRequestPipeline,
+    setRequestState,
     startRequest,
     subscribe
 } from '@/background/request';
-import { ERROR_KIND, REQUEST_OUTCOME, REQUEST_STATE } from '@/shared/constants';
+import { ERROR_KIND, REQUEST_DEADLINE_MS, REQUEST_OUTCOME, REQUEST_STATE } from '@/shared/constants';
+import { SlackError } from '@/shared/lib/slack';
 
 const makeRequestId = (n: number): string => `00000000-0000-4000-8000-${n.toString(16).padStart(12, '0')}`;
 
@@ -45,6 +48,7 @@ beforeEach(() => {
 
 afterEach(() => {
     _resetForTest();
+    vi.useRealTimers();
 });
 
 describe('startRequest', () => {
@@ -244,5 +248,167 @@ describe('late cancel and cleanup', () => {
         expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
         expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.FAILED);
         expect(getRequestStatus().reason).not.toBe('cancelled');
+    });
+});
+
+describe('cancelRequest terminal states', () => {
+    it('is idempotent once the request already ended cancelled', () => {
+        startRequest(params(30));
+        expect(cancelRequest()).toEqual({ ok: true, outcome: 'cancelled' });
+        expect(cancelRequest()).toEqual({ ok: true, outcome: 'cancelled' });
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.CANCELLED);
+    });
+
+    it('returns NO_ACTIVE_REQUEST after a successful complete', async () => {
+        startRequest(params(31));
+        expect(await completeRequest(makeRequestId(31))).toBe(true);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.SUCCEEDED);
+        const r = cancelRequest();
+        expect(r.ok).toBe(false);
+        if (!r.ok) expect(r.error).toBe(ERROR_KIND.NO_ACTIVE_REQUEST);
+    });
+});
+
+describe('deadline', () => {
+    it('expires the request when the armed deadline timer fires', () => {
+        vi.useFakeTimers();
+        startRequest(params(32));
+        vi.advanceTimersByTime(REQUEST_DEADLINE_MS);
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.EXPIRED);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+    });
+
+    it('createRequestGuard throws expired once the deadline has passed', () => {
+        vi.useFakeTimers();
+        const started = Date.now();
+        startRequest(params(33));
+        vi.setSystemTime(started + REQUEST_DEADLINE_MS + 1);
+        expect(() => createRequestGuard(makeRequestId(33))()).toThrow(SlackError);
+        try {
+            createRequestGuard(makeRequestId(33))();
+        } catch (err) {
+            expect(err).toBeInstanceOf(SlackError);
+            expect((err as SlackError).code).toBe('expired');
+        }
+    });
+});
+
+describe('attachDestination', () => {
+    it('disposes a destination attached after cancel and does not keep it', async () => {
+        startRequest(params(34));
+        cancelRequest();
+        const dest = { tabId: 11, dispose: vi.fn(async () => undefined), finish: vi.fn() };
+        attachDestination(makeRequestId(34), dest);
+        await vi.waitFor(() => expect(dest.dispose).toHaveBeenCalled());
+        expect(getRequestStatus().destinationTabId).toBeNull();
+        expect(dest.finish).not.toHaveBeenCalled();
+    });
+});
+
+describe('completeRequest', () => {
+    it('succeeds without a destination', async () => {
+        startRequest(params(35));
+        expect(await completeRequest(makeRequestId(35))).toBe(true);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.SUCCEEDED);
+        expect(getRequestStatus().outcome).toBeNull();
+    });
+
+    it('returns false when destination.finish throws and does not succeed', async () => {
+        startRequest(params(36));
+        const dest = {
+            tabId: 12,
+            dispose: vi.fn(async () => undefined),
+            finish: vi.fn(() => {
+                throw new Error('finish failed');
+            })
+        };
+        attachDestination(makeRequestId(36), dest);
+        expect(await completeRequest(makeRequestId(36))).toBe(false);
+        expect(getRequestStatus().state).not.toBe(REQUEST_STATE.SUCCEEDED);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.CHECKING_HOST);
+    });
+
+    it('succeeds when destination.finish resolves', async () => {
+        startRequest(params(37));
+        const dest = { tabId: 13, dispose: vi.fn(async () => undefined), finish: vi.fn() };
+        attachDestination(makeRequestId(37), dest);
+        expect(await completeRequest(makeRequestId(37))).toBe(true);
+        expect(dest.finish).toHaveBeenCalled();
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.SUCCEEDED);
+        expect(getRequestStatus().destinationTabId).toBe(13);
+    });
+});
+
+describe('runRequestPipeline', () => {
+    it('resolves immediately when no request is active', async () => {
+        const work = vi.fn(async () => undefined);
+        await expect(runRequestPipeline(makeRequestId(38), work)).resolves.toBeUndefined();
+        expect(work).not.toHaveBeenCalled();
+    });
+
+    it('fails the request when work returns without completing', async () => {
+        startRequest(params(39));
+        await runRequestPipeline(makeRequestId(39), async () => undefined);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.FAILED);
+    });
+
+    it.each([
+        ['disconnected', REQUEST_OUTCOME.DISCONNECTED],
+        ['expired', REQUEST_OUTCOME.EXPIRED],
+        ['no_source', REQUEST_OUTCOME.HOST_UNAVAILABLE],
+        ['client_not_empty', REQUEST_OUTCOME.ACCOUNT_MISMATCH],
+        ['failed', REQUEST_OUTCOME.FAILED]
+    ] as const)('maps SlackError(%s) to outcome %s', async (code, outcome) => {
+        const n = 40 + ['disconnected', 'expired', 'no_source', 'client_not_empty', 'failed'].indexOf(code);
+        startRequest(params(n));
+        await runRequestPipeline(makeRequestId(n), async () => {
+            throw new SlackError(code);
+        });
+        expect(getRequestStatus().outcome).toBe(outcome);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+    });
+});
+
+describe('setRequestState', () => {
+    it('records waiting_for_user', () => {
+        startRequest(params(50));
+        setRequestState(makeRequestId(50), REQUEST_STATE.WAITING_FOR_USER);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.WAITING_FOR_USER);
+    });
+
+    it('ignores SUCCEEDED and IDLE targets while the request is active', () => {
+        startRequest(params(51));
+        setRequestState(makeRequestId(51), REQUEST_STATE.SUCCEEDED);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.CHECKING_HOST);
+        setRequestState(makeRequestId(51), REQUEST_STATE.IDLE);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.CHECKING_HOST);
+    });
+
+    it('ignores updates after cancel', () => {
+        startRequest(params(52));
+        cancelRequest();
+        setRequestState(makeRequestId(52), REQUEST_STATE.WAITING_FOR_USER);
+        expect(getRequestStatus().state).toBe(REQUEST_STATE.IDLE);
+        expect(getRequestStatus().outcome).toBe(REQUEST_OUTCOME.CANCELLED);
+    });
+});
+
+describe('isRequestCurrent', () => {
+    it('is false after cancel even while cleanup is still in flight', async () => {
+        startRequest(params(53));
+        expect(isRequestCurrent(makeRequestId(53))).toBe(true);
+        let release: () => void = () => undefined;
+        const blocked = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const pipeline = runRequestPipeline(makeRequestId(53), async () => {
+            await blocked;
+        });
+        cancelRequest();
+        expect(isRequestCurrent(makeRequestId(53))).toBe(false);
+        expect(getRequestStatus().state).not.toBe(REQUEST_STATE.IDLE);
+        release();
+        await pipeline;
     });
 });

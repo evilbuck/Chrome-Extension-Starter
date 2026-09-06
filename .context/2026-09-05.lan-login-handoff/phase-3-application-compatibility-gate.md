@@ -1,6 +1,6 @@
 ---
-status: pending
-pending_reason: "Six verdicts recorded as `unresolved`. Live-browser observation rows in each per-app record are empty. Phase 4 (which does not require supported verdicts) can begin independently per the plan's `depends_on: [2, 3]` and Phase 4's scope."
+status: active
+pending_reason: "Slack existing-session mechanism and two-profile extension transfer passed locally; physical Mac/Linux and Case 1 remain unverified. Outlook is paused at its authentication boundary; Zoom remains untested. Full-case verdicts remain unresolved."
 reverted_at: 2026-09-05T19:55Z
 phase: 3
 order: 3
@@ -43,6 +43,8 @@ memory:
 Inherited user goal (from [plan-lan-login-handoff.md](plan-lan-login-handoff.md)): enable one person to use Microsoft 365, Zoom and Slack web applications from another computer they own on a shared tailnet or internal LAN without repeated lengthy login/logout flows, using either the host's existing Okta authentication or its existing session in the requested application, while the host remains logged in.
 
 This is the plan's decisive product-feasibility gate. Public documentation establishes normal SSO flows and browser constraints, but it does not establish that a usable Outlook, Slack or Zoom application session can be completed on another machine without a normal client login. This phase closes that evidence gap through isolated, explicitly authorized, non-secret observation. It writes compatibility contracts; it does not build application controllers.
+
+Current execution checkpoint (2026-09-06): Slack's exact shared-session mechanism was verified in an authorized local probe, then implemented and exercised through the extension between two isolated Chromium profiles. Client identity/reload and original-host preservation passed; physical Mac/Linux and Case 1 remain open. See `slack-session-transport-experiment.json`. The [Outlook report](research-outlook-session-transport.md) remains paused at its authentication boundary; no further Outlook access occurred.
 
 Phase 1 is a HARD dependency because the application surfaces, test profiles and authorization boundary must be explicit first. This phase has no dependency on Phase 2 for mechanism discovery and can execute in parallel with it. Any later live handoff across the peer channel waits for Phase 2.
 

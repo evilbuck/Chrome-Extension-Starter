@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     createIdentityStore,
+    createSavedRoleStore,
     createTrustStore,
     IDENTITY_DB_NAME,
     IDENTITY_RECORD_KEY,
-    IDENTITY_STORE_NAME
+    IDENTITY_STORE_NAME,
+    isPairedBrowser
 } from '@/offscreen/identity-storage';
+import { MSG } from '@/shared/constants';
 
 class FakeRequest<T> {
     result = undefined as T;
@@ -79,7 +82,9 @@ class FakeTransaction {
 
 class FakeDatabase {
     readonly committed = new Map<string, unknown>();
-    readonly objectStoreNames = { contains: (name: string) => name === IDENTITY_STORE_NAME };
+    hasStore = true;
+    createdStores: string[] = [];
+    readonly objectStoreNames = { contains: (name: string) => this.hasStore && name === IDENTITY_STORE_NAME };
     heldWrite: FakeTransaction | null = null;
     holdNextWrite = false;
     private writeReady: Promise<void> = Promise.resolve();
@@ -104,6 +109,11 @@ class FakeDatabase {
     }
 
     close(): void {}
+    createObjectStore(name: string): IDBObjectStore {
+        this.createdStores.push(name);
+        this.hasStore = true;
+        return {} as IDBObjectStore;
+    }
 }
 
 class FakeOpenRequest extends FakeRequest<FakeDatabase> {
@@ -183,5 +193,91 @@ describe('offscreen identity storage', () => {
         expect(first.privateKey.extractable).toBe(false);
         expect(second.privateKey.extractable).toBe(false);
         expect(first.privateKey).toBe(second.privateKey);
+    });
+
+    it('creates the identity object store on first upgrade', async () => {
+        const factory = new FakeFactory();
+        factory.db.hasStore = false;
+        const identity = await createIdentityStore(factory as unknown as IDBFactory).loadOrCreate();
+        expect(factory.db.createdStores).toContain(IDENTITY_STORE_NAME);
+        expect(identity.privateKey.extractable).toBe(false);
+    });
+
+    it('rejects stored identity keys that cannot be exported', async () => {
+        const factory = new FakeFactory();
+        const fakeKey = (type: 'private' | 'public'): CryptoKey =>
+            ({
+                type,
+                extractable: type !== 'private',
+                algorithm: { name: 'ECDSA', namedCurve: 'P-256' },
+                usages: type === 'private' ? ['sign'] : ['verify']
+            }) as CryptoKey;
+        factory.db.committed.set(IDENTITY_RECORD_KEY, {
+            privateKey: fakeKey('private'),
+            publicKey: fakeKey('public')
+        });
+        await expect(createIdentityStore(factory as unknown as IDBFactory).loadOrCreate()).rejects.toThrow(
+            'identity-invalid'
+        );
+    });
+    it('rejects generate-and-commit when the generated keys are not a valid identity', async () => {
+        const factory = new FakeFactory();
+        const spy = vi.spyOn(crypto.subtle, 'generateKey').mockResolvedValue({
+            privateKey: {
+                type: 'private',
+                extractable: false,
+                algorithm: { name: 'RSA' },
+                usages: ['sign']
+            } as CryptoKey,
+            publicKey: {
+                type: 'public',
+                extractable: true,
+                algorithm: { name: 'RSA' },
+                usages: ['verify']
+            } as CryptoKey
+        });
+        try {
+            await expect(createIdentityStore(factory as unknown as IDBFactory).loadOrCreate()).rejects.toThrow(
+                'identity-invalid'
+            );
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it('persists a public pair through trust store set', async () => {
+        const sendMessage = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+        vi.stubGlobal('chrome', { runtime: { sendMessage } });
+        const pair = {
+            id: '00000000-0000-4000-8000-000000000001',
+            role: 'host' as const,
+            peer: { publicKey: 'aGVsbG8=', label: 'Desk' },
+            createdAt: 1_700_000_000_000
+        };
+        await createTrustStore().set(pair);
+        expect(sendMessage).toHaveBeenCalledWith({
+            type: MSG.OFFSCREEN_PAIRING_STORAGE,
+            payload: { action: 'set', pair }
+        });
+    });
+
+    it('returns a saved host or client role and null otherwise', async () => {
+        const sendMessage = vi.fn();
+        vi.stubGlobal('chrome', { runtime: { sendMessage } });
+        const store = createSavedRoleStore();
+        sendMessage.mockResolvedValue({ ok: true, value: 'host' });
+        await expect(store.get()).resolves.toBe('host');
+        sendMessage.mockResolvedValue({ ok: true, value: 'client' });
+        await expect(store.get()).resolves.toBe('client');
+        sendMessage.mockResolvedValue({ ok: true, value: 'other' });
+        await expect(store.get()).resolves.toBeNull();
+    });
+
+    it('treats a non-paired trust value as absent', async () => {
+        vi.stubGlobal('chrome', {
+            runtime: { sendMessage: vi.fn().mockResolvedValue({ ok: true, value: { id: 'nope' } }) }
+        });
+        await expect(createTrustStore().get()).resolves.toBeNull();
+        expect(isPairedBrowser({ id: 'nope' })).toBe(false);
     });
 });

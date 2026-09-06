@@ -31,10 +31,18 @@ format: discrete
 | 4: Scoped Control Cutover | in-progress | hard | none | [phase-4-scoped-control-cutover.md](phase-4-scoped-control-cutover.md) |
 | 5: Host Application Preparation | pending | medium | none | [phase-5-host-application-preparation.md](phase-5-host-application-preparation.md) |
 | 6: Outlook Completion | pending | hard | none | [phase-6-outlook-completion.md](phase-6-outlook-completion.md) |
-| 7: Slack Completion | pending | hard | none | [phase-7-slack-completion.md](phase-7-slack-completion.md) |
+| 7: Slack Completion | active — local extension proof | hard | none | [phase-7-slack-completion.md](phase-7-slack-completion.md) |
 | 8: Zoom Web App Completion | pending | hard | none | [phase-8-zoom-completion.md](phase-8-zoom-completion.md) |
 | 9: Integrated Failure Matrix | pending | hard | none | [phase-9-integrated-failure-matrix.md](phase-9-integrated-failure-matrix.md) |
 | 10: Demonstrated Cutover | pending | medium | none | [phase-10-demonstrated-cutover.md](phase-10-demonstrated-cutover.md) |
+
+### Current execution checkpoint — 2026-09-06
+
+- **Phase 2:** user-confirmed same-machine and cross-machine transport, including two-profile echo and Options closure/reopen persistence. Remaining lifecycle and environment evidence is not implicitly completed. See `phase-2-evidence.md`.
+- **Phase 3:** all full-case verdicts remain unresolved. Slack's separately authorized shared-session mechanism and local extension transfer passed; physical Mac/Linux and Case 1 remain open. Outlook stopped at authentication and is paused; Zoom is untested.
+- **Phase 4:** control-plane code exists, but its acceptance is not proved by a transport echo. Request routing and lifecycle acceptance remain independent checks.
+- **Phases 5–8:** require concrete permitted application contracts. Slack now has an exact locally verified controller and two-profile WebRTC proof; Phase 7 remains open for the physical pair and Case 1. Outlook is paused and Zoom unimplemented.
+- Manual connection-setup simplification is explicitly deferred by the user; it is not the next execution phase.
 
 ## Dependency Matrix
 
@@ -47,7 +55,7 @@ format: discrete
 | Phase 3 → Phase 5 | HARD | Host preparation consumes exact application/account verification contracts. |
 | Phase 4 → Phase 5 | HARD | Host orchestration needs scoped state, sender trust and invalidation rules. |
 | Phases 2–5 → Phase 6 | HARD | Outlook completion needs transport, Outlook evidence, common control and host preparation. |
-| Phase 6 → Phase 7 | HARD | Shared manifest/registry/UI integration is serialized; Slack must preserve Outlook behavior. |
+| Phase 6 → Phase 7 | User-overridden sequencing | User selected Slack ahead of paused Outlook; local Slack mechanism and controller verified without further Outlook access. Physical-pair acceptance remains open. |
 | Phase 7 → Phase 8 | HARD | Shared integration is serialized; Zoom must preserve Outlook and Slack behavior. |
 | Phases 6–8 → Phase 9 | HARD | The integrated matrix requires all three provider slices. |
 | Phase 9 → Phase 10 | HARD | Cleanup, permissions and claims must follow observed integrated results. |

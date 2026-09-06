@@ -73,9 +73,9 @@ Per application, decide which of these applies:
 
 | Application | Account class for the transport gate (Phase 2) | Account class for the compatibility gate (Phase 3) | Notes |
 |---|---|---|---|
-| Outlook | A or B — `not observed (requires user observation)` | A or B — `not observed (requires user observation)` | |
-| Slack | A or B — `not observed (requires user observation)` | A or B — `not observed (requires user observation)` | |
-| Zoom | A or B — `not observed (requires user observation)` | A or B — `not observed (requires user observation)` | |
+| Outlook | No application account needed for synthetic transport | A — user selected disposable test accounts on 2026-09-05 | Exact test profile and sign-in state awaiting preparation. |
+| Slack | No application account needed for synthetic transport | A — user selected disposable test accounts on 2026-09-05 | Exact test workspace/profile and sign-in state awaiting preparation. |
+| Zoom | No application account needed for synthetic transport | A — user selected disposable test accounts on 2026-09-05 | Exact test profile and sign-in state awaiting preparation. |
 
 If class B is chosen for any row, the corresponding Phase 3 evidence record must be separately authorized and clearly labeled as a real-tenant observation rather than extrapolated from a disposable tenant.
 
@@ -87,7 +87,7 @@ The plan forbids manufacturing Case 1 by logging out the persistent host. Choose
 - **Separate browser / container** running on the host, with no connection to the persistent host session.
 - **Prepared test-state profile** stored under a clearly distinguishable name.
 
-Chosen method: `____________ (not observed — requires user observation)`
+Chosen method: separate disposable Chrome profiles for the compatibility experiments. Keep the persistent host profile untouched; do not log it out to manufacture Case 1. Actual profile preparation and browser access remain pending.
 
 Confirm the chosen method does NOT sign out or invalidate the persistent host's existing Outlook / Slack / Zoom sessions.
 

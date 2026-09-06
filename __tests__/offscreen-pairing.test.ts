@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type PairingIdentity, type SavedRoleStore, type TrustStore } from '@/offscreen/identity-storage';
+import type { PairingIdentity, SavedRoleStore, TrustStore } from '@/offscreen/identity-storage';
 import { PairingController, type PairingPeer, type PairingSocket } from '@/offscreen/pairing';
 import { ERROR_KIND, LIFECYCLE, type Lifecycle, MSG, OFFSCREEN_TARGET, PAYLOAD_KIND } from '@/shared/constants';
 import type { PeerEnvelope, PeerPayload, PeerResponsePayload } from '@/shared/lib/envelope';
 import { encodePairingBytes, signPairingText } from '@/shared/lib/pairing-crypto';
 import {
+    PAIRING_MAX_DESCRIPTOR_LENGTH,
+    PAIRING_MAX_FRAME_BYTES,
     PAIRING_ORIGIN,
     PAIRING_SOCKET_PROTOCOL,
     type PairedBrowser,
@@ -34,21 +36,30 @@ class FakePeer implements PairingPeer {
     closed = false;
     applied: string[] = [];
     offers = 0;
+    offerResult = 'local-offer';
+    answerResult = 'local-answer';
+    throwOnClose = false;
+    beforeOffer: (() => void | Promise<void>) | null = null;
+    beforeAccept: (() => void | Promise<void>) | null = null;
+    beforeApply: (() => void | Promise<void>) | null = null;
     private readonly listeners = new Set<PeerListener>();
 
     async hostCreateOffer(): Promise<string> {
+        if (this.beforeOffer) await this.beforeOffer();
         this.offers += 1;
         this.state = LIFECYCLE.SIGNALING;
-        return 'local-offer';
+        return this.offerResult;
     }
 
     async clientAcceptOffer(remote: string): Promise<string> {
+        if (this.beforeAccept) await this.beforeAccept();
         this.applied.push(remote);
         this.state = LIFECYCLE.SIGNALING;
-        return 'local-answer';
+        return this.answerResult;
     }
 
     async applyRemoteAnswer(remote: string): Promise<void> {
+        if (this.beforeApply) await this.beforeApply();
         this.applied.push(remote);
         this.state = LIFECYCLE.CONNECTING;
         for (const listener of this.listeners) listener({ type: 'state', state: this.state, error: null });
@@ -62,6 +73,7 @@ class FakePeer implements PairingPeer {
     }
 
     close(): void {
+        if (this.throwOnClose) throw new Error('peer-close');
         this.closed = true;
         this.state = LIFECYCLE.CLOSED;
     }
@@ -80,11 +92,27 @@ class FakePeer implements PairingPeer {
         this.state = LIFECYCLE.CONNECTED;
         for (const listener of this.listeners) listener({ type: 'state', state: this.state, error: null });
     }
+
+    emitFailed(error = 'ice-failed'): void {
+        this.state = LIFECYCLE.FAILED;
+        for (const listener of this.listeners) listener({ type: 'state', state: this.state, error });
+    }
+
+    emitClosed(): void {
+        this.state = LIFECYCLE.CLOSED;
+        for (const listener of this.listeners) listener({ type: 'state', state: this.state, error: null });
+    }
+
+    emitMessage(envelope: PeerEnvelope): void {
+        for (const listener of this.listeners) listener({ type: 'message', state: this.state, envelope });
+    }
 }
 
 class FakeSocket implements PairingSocket {
     readyState = 1;
     sent: string[] = [];
+    throwOnSend: Error | null = null;
+    throwOnClose = false;
     onopen: ((event: Event) => void) | null = null;
     onmessage: ((event: MessageEvent) => void) | null = null;
     onclose: ((event: CloseEvent) => void) | null = null;
@@ -98,10 +126,12 @@ class FakeSocket implements PairingSocket {
     }
 
     send(data: string): void {
+        if (this.throwOnSend) throw this.throwOnSend;
         this.sent.push(data);
     }
 
     close(): void {
+        if (this.throwOnClose) throw new Error('socket-close');
         this.readyState = 3;
     }
 }
@@ -139,16 +169,24 @@ describe('offscreen pairing controller', () => {
 
     const roleStore = (): SavedRoleStore => ({ get: async () => savedRole });
 
-    const make = () => {
-        const Socket = class extends FakeSocket {
-            constructor(url: string, protocols?: string | string[]) {
-                super(url, protocols);
-                sockets.push(this);
-            }
-        };
+    const make = (opts?: {
+        identity?: { loadOrCreate: () => Promise<PairingIdentity> };
+        trust?: TrustStore;
+        WebSocket?: new (url: string, protocols?: string | string[]) => PairingSocket;
+        onPeerMessage?: (envelope: PeerEnvelope) => void;
+        configurePeer?: (peer: FakePeer) => void;
+    }) => {
+        const Socket =
+            opts?.WebSocket ??
+            class extends FakeSocket {
+                constructor(url: string, protocols?: string | string[]) {
+                    super(url, protocols);
+                    sockets.push(this);
+                }
+            };
         return new PairingController({
-            identity: { loadOrCreate: async () => host },
-            trust: trust(),
+            identity: opts?.identity ?? { loadOrCreate: async () => host },
+            trust: opts?.trust ?? trust(),
             savedRole: roleStore(),
             fetch: (url, init) => fetchImpl(String(url), init),
             WebSocket: Socket,
@@ -157,16 +195,21 @@ describe('offscreen pairing controller', () => {
             randomNonce: () => 'N'.repeat(32),
             createPeer: () => {
                 const peer = new FakePeer();
+                opts?.configurePeer?.(peer);
                 peers.push(peer);
                 return peer;
             },
             onChange: () => {},
-            onPeerMessage: () => {}
+            onPeerMessage: opts?.onPeerMessage ?? (() => {})
         });
     };
 
     const emit = (socket: FakeSocket, message: unknown): void => {
         socket.onmessage?.(new MessageEvent('message', { data: JSON.stringify(message) }));
+    };
+
+    const emitRaw = (socket: FakeSocket, data: unknown): void => {
+        socket.onmessage?.({ data } as MessageEvent);
     };
 
     const pendingMessage = (attemptId: string, identity: PairingIdentity) => ({
@@ -189,6 +232,9 @@ describe('offscreen pairing controller', () => {
 
     const signedAnswer = (identity: PairingIdentity, connectionId: string, descriptor: string) =>
         signPairingText(identity.privateKey, pairingSignalText(ROOM_ID, 'client', { connectionId, descriptor }));
+
+    const signedOffer = (identity: PairingIdentity, connectionId: string, descriptor: string) =>
+        signPairingText(identity.privateKey, pairingSignalText(ROOM_ID, 'host', { connectionId, descriptor }));
 
     const hostUntilConnected = async (pairing: PairingController, socket: FakeSocket): Promise<FakePeer> => {
         emit(socket, pendingMessage(ATTEMPT_A, client));
@@ -459,6 +505,648 @@ describe('offscreen pairing controller', () => {
             expect(pairing.snapshot().error).toBe('invalid_message');
         });
         expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('cancels a waiting invitation over the socket and is a no-op while idle', async () => {
+        const pairing = make();
+        expect((await pairing.handleCommand({ action: 'cancel' })).ok).toBe(true);
+        expect(pairing.snapshot()).toMatchObject({ phase: 'idle', code: null, pair: null, error: null });
+        expect(sockets).toHaveLength(0);
+
+        expect((await pairing.handleCommand({ action: 'create', label: 'HostBox' })).ok).toBe(true);
+        expect(pairing.snapshot().phase).toBe('waiting');
+        const socket = sockets[0];
+        const cancel = await pairing.handleCommand({ action: 'cancel' });
+        expect(cancel.ok).toBe(true);
+        expect(socket.sent.map((frame) => JSON.parse(frame).type)).toEqual(['cancel']);
+        expect(pairing.snapshot()).toMatchObject({ phase: 'idle', code: null, pending: null, pair: null });
+        expect(socket.readyState).toBe(3);
+    });
+
+    it('forgets an unpaired controller without contacting the broker', async () => {
+        const pairing = make();
+        await pairing.ready();
+        const result = await pairing.handleCommand({ action: 'forget' });
+        expect(result).toMatchObject({ ok: true, pairing: { phase: 'idle', pair: null } });
+        expect(stored).toBeNull();
+    });
+
+    it('reports unavailable when unpaired forget cannot clear the trust store', async () => {
+        const pairing = make({
+            trust: {
+                get: async () => null,
+                set: async () => {},
+                clear: async () => {
+                    throw new Error('idb');
+                }
+            }
+        });
+        await pairing.ready();
+        expect(await pairing.handleCommand({ action: 'forget' })).toEqual({ ok: false, error: 'unavailable' });
+        expect(pairing.snapshot()).toMatchObject({ phase: 'idle', error: 'unavailable', pair: null });
+    });
+
+    it('rejects confirm for an unknown attempt while idle', async () => {
+        const pairing = make();
+        await pairing.ready();
+        expect(await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A })).toEqual({
+            ok: false,
+            error: 'invalid_peer'
+        });
+        expect(pairing.snapshot().phase).toBe('idle');
+    });
+
+    it('rejects join when room credentials are malformed or expired', async () => {
+        fetchImpl = async () =>
+            jsonResponse({ ok: true, roomId: 'not-a-uuid', ticket: TICKET, code: 'ABCDE', expiresAt: null });
+        const malformed = make();
+        expect(await malformed.handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).toEqual({
+            ok: false,
+            error: 'invalid_message'
+        });
+        expect(malformed.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+
+        fetchImpl = async () => jsonResponse({ error: 'expired' }, 410);
+        const expiredHttp = make();
+        expect(await expiredHttp.handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).toEqual({
+            ok: false,
+            error: 'expired'
+        });
+        expect(expiredHttp.snapshot()).toMatchObject({ phase: 'expired', error: 'expired' });
+
+        fetchImpl = async () => jsonResponse(credentials());
+        const pairing = make();
+        expect((await pairing.handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).ok).toBe(true);
+        emit(sockets[0], { type: 'waiting', expiresAt: 1_699_000_000_000 });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'expired', error: 'expired' });
+        });
+    });
+
+    it('maps a malformed or wrong-role remote signal to a pairing error without applying it', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('connecting');
+        });
+
+        emitRaw(socket, '{not-json');
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+        expect(peers[0]?.applied ?? []).toEqual([]);
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('rejects a remote answer signed for the wrong role and leaves the descriptor unapplied', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('connecting');
+        });
+        const signature = await signedOffer(client, CONNECTION_A, 'answer-one');
+        emit(socket, { type: 'signal', connectionId: CONNECTION_A, descriptor: 'answer-one', signature });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().error).toBe('invalid_peer');
+        });
+        expect(peers[0]?.applied ?? []).toEqual([]);
+        expect(pairing.snapshot().phase).toBe('failed');
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('rejects an empty remote descriptor as invalid_message', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('connecting');
+        });
+        emit(socket, { type: 'signal', connectionId: CONNECTION_A, descriptor: '', signature: 'AAAA' });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+        expect(peers[0]?.applied ?? []).toEqual([]);
+    });
+
+    it('maps socket close and error mid-attempt onto disconnected and unavailable', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        sockets[0].onclose?.(new CloseEvent('close'));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'disconnected' });
+        });
+
+        const unavailable = make();
+        await unavailable.handleCommand({ action: 'create', label: 'HostBox' });
+        sockets[1].onerror?.(new Event('error'));
+        await vi.waitFor(() => {
+            expect(unavailable.snapshot()).toMatchObject({ phase: 'failed', error: 'unavailable' });
+        });
+    });
+
+    it('disconnects an established pair when the rendezvous socket closes', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        const peer = await hostUntilConnected(pairing, socket);
+        socket.onclose?.(new CloseEvent('close'));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'disconnected', error: 'disconnected' });
+        });
+        expect(peer.closed).toBe(true);
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('reconnects a populated trust store and refuses connect when unpaired or busy', async () => {
+        const unpaired = make();
+        await unpaired.ready();
+        expect(await unpaired.handleCommand({ action: 'connect' })).toEqual({ ok: false, error: 'unpaired' });
+
+        stored = {
+            id: ROOM_ID,
+            role: 'host',
+            peer: { publicKey: client.publicKeySpki, label: 'ClientBox' },
+            createdAt: 1_700_000_000_000
+        };
+        fetchImpl = async () => jsonResponse(credentials(null));
+        const pairing = make();
+        await pairing.ready();
+        expect(pairing.snapshot().phase).toBe('disconnected');
+        expect((await pairing.handleCommand({ action: 'connect' })).ok).toBe(true);
+        expect(pairing.snapshot().phase).toBe('connecting');
+        expect(sockets[0].url).toBe(`${PAIRING_ORIGIN}/v1/socket/${ROOM_ID}`);
+        expect(await pairing.handleCommand({ action: 'connect' })).toEqual({ ok: false, error: 'busy' });
+        expect(pairing.snapshot().phase).toBe('connecting');
+    });
+
+    it('fails reconnect when the identity store cannot load keys', async () => {
+        stored = {
+            id: ROOM_ID,
+            role: 'host',
+            peer: { publicKey: client.publicKeySpki, label: 'ClientBox' },
+            createdAt: 1_700_000_000_000
+        };
+        const pairing = make({
+            identity: {
+                loadOrCreate: async () => {
+                    throw new Error('no-identity');
+                }
+            }
+        });
+        await pairing.ready();
+        expect(await pairing.handleCommand({ action: 'connect' })).toEqual({ ok: false, error: 'unavailable' });
+        expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'unavailable' });
+    });
+
+    it('rejects a second create while waiting as busy', async () => {
+        const pairing = make();
+        expect((await pairing.handleCommand({ action: 'create', label: 'HostBox' })).ok).toBe(true);
+        expect(pairing.snapshot()).toMatchObject({ phase: 'waiting', code: 'ABCDE' });
+        expect(await pairing.handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'busy'
+        });
+        expect(pairing.snapshot().phase).toBe('waiting');
+        expect(sockets).toHaveLength(1);
+    });
+
+    it('maps a throwing socket constructor and a throwing confirm send to unavailable', async () => {
+        class ThrowingSocket implements PairingSocket {
+            readyState = 0;
+            onopen = null;
+            onmessage = null;
+            onclose = null;
+            onerror = null;
+            constructor(_url: string, _protocols?: string | string[]) {
+                throw new Error('ws-unavailable');
+            }
+            send(): void {}
+            close(): void {}
+        }
+        const pairing = make({
+            WebSocket: ThrowingSocket
+        });
+        expect(await pairing.handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'unavailable'
+        });
+        expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'unavailable' });
+
+        const confirming = make();
+        await confirming.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(confirming.snapshot().phase).toBe('confirming');
+        });
+        socket.throwOnSend = new Error('send-failed');
+        expect(await confirming.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A })).toEqual({
+            ok: false,
+            error: 'unavailable'
+        });
+        expect(confirming.snapshot().phase).toBe('confirming');
+    });
+
+    it('still cancels locally when the waiting socket cannot send cancel', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        sockets[0].throwOnSend = new Error('send-failed');
+        expect((await pairing.handleCommand({ action: 'cancel' })).ok).toBe(true);
+        expect(pairing.snapshot()).toMatchObject({ phase: 'idle', pair: null });
+    });
+
+    it('answers a host offer on the client path and withholds authorization until connected', async () => {
+        const pairing = make();
+        expect((await pairing.handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).ok).toBe(true);
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, {
+            type: 'paired',
+            connectionId: CONNECTION_A,
+            pair: {
+                id: ROOM_ID,
+                role: 'client',
+                peer: { publicKey: client.publicKeySpki, label: 'ClientBox' },
+                createdAt: 1_700_000_000_000
+            }
+        });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('connecting');
+            expect(pairing.getRole()).toBe('client');
+        });
+        const signature = await signedOffer(client, CONNECTION_A, 'offer-one');
+        emit(socket, { type: 'signal', connectionId: CONNECTION_A, descriptor: 'offer-one', signature });
+        await vi.waitFor(() => {
+            expect(peers[0]?.applied).toEqual(['offer-one']);
+            expect(socket.sent.some((frame) => JSON.parse(frame).type === 'signal')).toBe(true);
+        });
+        const answer = JSON.parse(socket.sent.find((frame) => JSON.parse(frame).type === 'signal') ?? '{}');
+        expect(answer).toMatchObject({ type: 'signal', connectionId: CONNECTION_A, descriptor: 'local-answer' });
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+        peers[0]?.emitConnected();
+        await vi.waitFor(() => {
+            expect(pairing.isAuthorized(CONNECTION_A)).toBe(true);
+            expect(pairing.snapshot().phase).toBe('connected');
+        });
+    });
+
+    it('promotes a join without a displayed code from creating to waiting on the socket ack', async () => {
+        fetchImpl = async () => jsonResponse(credentials(null));
+        const pairing = make();
+        expect((await pairing.handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).ok).toBe(true);
+        expect(pairing.snapshot()).toMatchObject({ phase: 'creating', code: null });
+        emit(sockets[0], { type: 'waiting', expiresAt: 1_700_000_120_000 });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'waiting', expiresAt: 1_700_000_120_000 });
+        });
+    });
+
+    it('fails closed on unparseable, oversized, or unrecognized socket frames', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+
+        emitRaw(socket, { not: 'a-string' });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+
+        const oversized = make();
+        await oversized.handleCommand({ action: 'create', label: 'HostBox' });
+        emitRaw(sockets[1], 'x'.repeat(PAIRING_MAX_FRAME_BYTES + 1));
+        await vi.waitFor(() => {
+            expect(oversized.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+
+        const unknown = make();
+        await unknown.handleCommand({ action: 'create', label: 'HostBox' });
+        emit(sockets[2], { type: 'nope' });
+        await vi.waitFor(() => {
+            expect(unknown.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+    });
+
+    it('applies a broker error frame and ignores a waiting ack with a non-numeric expiry', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        emit(sockets[0], { type: 'error', error: 'rejected' });
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'rejected', error: 'rejected' });
+        });
+
+        const waiting = make();
+        await waiting.handleCommand({ action: 'create', label: 'HostBox' });
+        emit(sockets[1], { type: 'waiting', expiresAt: 'later' });
+        await vi.waitFor(() => {
+            expect(waiting.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+    });
+
+    it('maps invitation HTTP failures onto the broker error or status class', async () => {
+        fetchImpl = async () => jsonResponse({ error: 'invalid_code' }, 400);
+        expect(await make().handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).toEqual({
+            ok: false,
+            error: 'invalid_code'
+        });
+
+        fetchImpl = async () => jsonResponse({}, 429);
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'rate_limited'
+        });
+
+        fetchImpl = async () => jsonResponse({}, 409);
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'busy'
+        });
+
+        fetchImpl = async () => jsonResponse({}, 503);
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'unavailable'
+        });
+
+        fetchImpl = async () => {
+            throw new TypeError('network');
+        };
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'unavailable'
+        });
+    });
+
+    it('refuses create and join that disagree with a saved role', async () => {
+        savedRole = 'client';
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'invalid_peer'
+        });
+        savedRole = 'host';
+        expect(await make().handleCommand({ action: 'join', code: 'ABCDE', label: 'ClientBox' })).toEqual({
+            ok: false,
+            error: 'invalid_peer'
+        });
+    });
+
+    it('rejects a paired event that arrives before local confirm', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_peer' });
+        });
+        expect(stored).toBeNull();
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('fails the host offer when the local descriptor is oversized', async () => {
+        const pairing = make({
+            configurePeer: (peer) => {
+                peer.offerResult = 'x'.repeat(PAIRING_MAX_DESCRIPTOR_LENGTH + 1);
+            }
+        });
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'invalid_message' });
+        });
+        expect(socket.sent.some((frame) => JSON.parse(frame).type === 'signal')).toBe(false);
+    });
+
+    it('fails the host offer when the rendezvous socket drops during local SDP', async () => {
+        const pairing = make({
+            configurePeer: (peer) => {
+                peer.beforeOffer = () => {
+                    sockets[0].readyState = 3;
+                };
+            }
+        });
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'disconnected', error: 'disconnected' });
+        });
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('undoes a pin persisted after the attempt was cancelled', async () => {
+        let releaseSet!: () => void;
+        let resolveStarted!: () => void;
+        const setStarted = new Promise<void>((resolve) => {
+            resolveStarted = resolve;
+        });
+        const setGate = new Promise<void>((resolve) => {
+            releaseSet = resolve;
+        });
+        const pairing = make({
+            trust: {
+                get: async () => stored,
+                set: async (pair) => {
+                    stored = pair;
+                    resolveStarted();
+                    await setGate;
+                },
+                clear: async () => {
+                    stored = null;
+                }
+            }
+        });
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await setStarted;
+        expect((await pairing.handleCommand({ action: 'cancel' })).ok).toBe(true);
+        releaseSet();
+        await vi.waitFor(() => {
+            expect(stored).toBeNull();
+        });
+        expect(pairing.snapshot()).toMatchObject({ phase: 'idle', pair: null });
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('marks connection_failed when the peer reports a failed lifecycle', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        await hostUntilConnected(pairing, socket);
+        peers[0]?.emitFailed('ice-failed');
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'failed', error: 'connection_failed' });
+        });
+        expect(pairing.getLifecycle()).toBe(LIFECYCLE.FAILED);
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('disconnects when an authorized peer closes', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        const peer = await hostUntilConnected(pairing, socket);
+        peer.emitClosed();
+        await vi.waitFor(() => {
+            expect(pairing.snapshot()).toMatchObject({ phase: 'disconnected', error: 'disconnected' });
+        });
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(false);
+    });
+
+    it('forwards authorized peer messages and drops unauthorized ones', async () => {
+        const received: PeerEnvelope[] = [];
+        const pairing = make({
+            onPeerMessage: (envelope) => {
+                received.push(envelope);
+            }
+        });
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        const envelope = {
+            v: 1,
+            role: 'client',
+            connectionId: CONNECTION_A,
+            requestId: ATTEMPT_A,
+            deadline: 1_700_000_120_000,
+            payload: { kind: PAYLOAD_KIND.PING }
+        } as PeerEnvelope;
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A });
+        emit(socket, pairedMessage(client, CONNECTION_A));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('connecting');
+        });
+        peers[0]?.emitMessage(envelope);
+        expect(received).toEqual([]);
+        const signature = await signedAnswer(client, CONNECTION_A, 'answer-one');
+        emit(socket, { type: 'signal', connectionId: CONNECTION_A, descriptor: 'answer-one', signature });
+        await vi.waitFor(() => {
+            expect(peers[0]?.applied).toEqual(['answer-one']);
+        });
+        peers[0]?.emitConnected();
+        await vi.waitFor(() => {
+            expect(pairing.isAuthorized(CONNECTION_A)).toBe(true);
+        });
+        peers[0]?.emitMessage(envelope);
+        expect(received).toEqual([envelope]);
+    });
+
+    it('returns the current snapshot for status and tears down via dispose', async () => {
+        const pairing = make();
+        expect(await pairing.handleCommand({ action: 'status' })).toEqual({
+            ok: true,
+            pairing: pairing.snapshot()
+        });
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        expect(pairing.snapshot().phase).toBe('waiting');
+        pairing.dispose();
+        expect(pairing.snapshot()).toMatchObject({ phase: 'idle', code: null });
+        expect(sockets[0].sent.map((frame) => JSON.parse(frame).type)).toEqual(['cancel']);
+    });
+
+    it('confirms as disconnected when the waiting socket is no longer open', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        emit(socket, pendingMessage(ATTEMPT_A, client));
+        await vi.waitFor(() => {
+            expect(pairing.snapshot().phase).toBe('confirming');
+        });
+        socket.readyState = 3;
+        expect(await pairing.handleCommand({ action: 'confirm', attemptId: ATTEMPT_A })).toEqual({
+            ok: false,
+            error: 'disconnected'
+        });
+        expect(pairing.snapshot().phase).toBe('confirming');
+    });
+
+    it('rejects room credentials that fail ticket, code, or expiry checks', async () => {
+        fetchImpl = async () =>
+            jsonResponse({ ok: true, roomId: ROOM_ID, ticket: 'short', code: 'ABCDE', expiresAt: null });
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'invalid_message'
+        });
+
+        fetchImpl = async () =>
+            jsonResponse({ ok: true, roomId: ROOM_ID, ticket: TICKET, code: 'ABC1E', expiresAt: null });
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'invalid_message'
+        });
+
+        fetchImpl = async () =>
+            ({
+                ok: true,
+                status: 200,
+                json: async () => ({
+                    ok: true,
+                    roomId: ROOM_ID,
+                    ticket: TICKET,
+                    code: 'ABCDE',
+                    expiresAt: Number.POSITIVE_INFINITY
+                })
+            }) as Response;
+        expect(await make().handleCommand({ action: 'create', label: 'HostBox' })).toEqual({
+            ok: false,
+            error: 'invalid_message'
+        });
+    });
+
+    it('ignores rendezvous socket errors after the pair is already connected', async () => {
+        const pairing = make();
+        await pairing.handleCommand({ action: 'create', label: 'HostBox' });
+        const socket = sockets[0];
+        await hostUntilConnected(pairing, socket);
+        socket.onerror?.(new Event('error'));
+        expect(pairing.snapshot().phase).toBe('connected');
+        expect(pairing.isAuthorized(CONNECTION_A)).toBe(true);
     });
 });
 

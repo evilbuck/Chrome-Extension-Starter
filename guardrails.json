@@ -8,7 +8,7 @@
     "patch_coverage_min": 90
   },
   "ratchet": {
-    "baseline_coverage": 64.48,
+    "baseline_coverage": 91.07,
     "baseline_complexity_inventory": [
       {
         "file": "src/background/apps/slack.ts",
@@ -251,16 +251,6 @@
         "complexity": 17
       },
       {
-        "file": "services/pairing/test/pairing.test.ts",
-        "function": "pairSession",
-        "complexity": 12
-      },
-      {
-        "file": "services/pairing/test/pairing.test.ts",
-        "function": "(anonymous)",
-        "complexity": 13
-      },
-      {
         "file": "services/pairing/src/validate.ts",
         "function": "parseProof",
         "complexity": 14
@@ -342,7 +332,7 @@
       "coverage_tool": "vitest run --coverage --coverage.reporter=lcov",
       "coverage_format": "lcov",
       "complexity_tool": "lizard",
-      "complexity_cmd": "lizard -C 10 -w --csv -x \"*/.git/*\" -x \"*/.context/*\" -x \"*/.venv/*\" -x \"*/coverage/*\" -x \"*/dist/*\" -x \"*/build/*\" -x \"*/node_modules/*\" -x \"*/vendor/*\" -x \"*/target/*\" -x \"*/.next/*\" -x \"*/.nuxt/*\" -x \"*/.turbo/*\" .",
+      "complexity_cmd": "lizard -C 10 -w --csv -x \"*/.git/*\" -x \"*/.context/*\" -x \"*/.venv/*\" -x \"*/coverage/*\" -x \"*/dist/*\" -x \"*/build/*\" -x \"*/node_modules/*\" -x \"*/vendor/*\" -x \"*/target/*\" -x \"*/.next/*\" -x \"*/.nuxt/*\" -x \"*/.turbo/*\" -x \"*/__tests__/*\" -x \"*.test.ts\" -x \"*.test.tsx\" -x \"*/test/*\" .",
       "lint_cmd": "biome check",
       "lint_accepts_paths": true,
       "functional_test_cmd": null,

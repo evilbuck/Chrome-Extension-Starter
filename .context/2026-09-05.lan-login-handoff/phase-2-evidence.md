@@ -4,7 +4,7 @@ date: 2026-09-05
 phase: 2
 owner: orchestrator
 filled_by_user: false
-gate_passed: awaiting-cross-machine
+gate_passed: user-confirmed-cross-machine-transport; remaining-lifecycle-checks-open
 honesty_reviewed: true
 topics: [phase-2, transport-gate, evidence, webrtc, offscreen, rtcpeerconnection]
 memory:
@@ -18,6 +18,19 @@ memory:
 
 > Inherited user goal (from [plan-lan-login-handoff.md](plan-lan-login-handoff.md)):
 > enable one person to use Microsoft 365, Zoom and Slack web applications from another computer they own on a shared tailnet or internal LAN without repeated lengthy login/logout flows, using either the host's existing Okta authentication or its existing session in the requested application, while the host remains logged in.
+
+## Current checkpoint — 2026-09-05
+
+This checkpoint supersedes the earlier “awaiting cross-machine” transport statements below, which describe the initial implementation session.
+
+- The user confirmed successful two-profile offer/answer exchange and echo tests.
+- The user confirmed both profiles stayed connected after closing and reopening Options.
+- The user then confirmed that the transport works across two computers.
+- The sender-context fix was separately verified in two isolated Chromium profiles: offer/answer, both connected, echo in both directions, Options reload, and explicit disconnect. See `sender-context-fix.json`.
+- Exact OS/browser versions and the route category of the user's cross-machine run were not provided. Do not infer them from the older Mac/Linux planning assumptions.
+- Worker termination/revival, browser/offscreen termination, and live network-loss behavior remain separate acceptance checks. These transport confirmations do not complete Phase 4 request lifecycle checks or establish application compatibility.
+
+The working extension-only transport does not require a companion fallback. The next product-feasibility work is Phase 3, subject to Phase 1's application test-account/profile authorization boundary.
 
 ## Scope of this evidence
 

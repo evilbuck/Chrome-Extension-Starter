@@ -70,6 +70,7 @@ The user has separated the development proof of concept from the eventual shippe
 - **No-pairing is test-only.** The internal-LAN development exception may carry synthetic traffic or disposable-account tests only. It never permits transfer of real personal, employer, customer or enterprise authentication state.
 - **No concealment objective.** The product must not hide a client device, suppress security alerts, evade monitoring, impersonate another person or make a provider believe that the client is the host.
 
+
 ## Proposed host–client workflows
 
 This is an iteration of the existing brainstorm, not an implementation plan or a claim of working integrations. The user now prefers an application-first approach: control the host browser to sign into the target app through normal Okta SSO when necessary, rather than making general Okta-session portability the primary design. This is a preferred direction to investigate, not proof that application-session sharing is easier or feasible.

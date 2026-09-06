@@ -1,127 +1,92 @@
 ---
-status: pending
+status: active
 date: 2026-09-05
+updated: 2026-09-06
 phase: 3
 application: outlook-web
-target: outlook.office.com / outlook.office365.com
-surface: Outlook on the web (mail, calendar)
-verdict: unresolved (six-of-six pending live-browser observation)
-topics: [outlook, microsoft, entra-id, fastpass, conditional-access]
+target: outlook.office365.com / outlook.office.com / outlook.cloud.microsoft
+surface: Outlook on the web
+verdict: unresolved
+topics: [outlook, microsoft, session-portability, canonical-domain, authentication-boundary]
 related:
   - plan-lan-login-handoff.md
   - research-auth-compatibility.md
+  - real-outlook-transport-experiment.json
+  - outlook-read-only-inspection.json
   - compatibility-gate-summary.md
 memory:
   - lan-login-handoff-implementation-2026-09-05.md
   - lan-login-handoff-planning-2026-09-05.md
   - lan-login-handoff-phasing-2026-09-05.md
-
 ---
 
-# Outlook on the web — compatibility contract evidence (DRAFT, UNRESOLVED)
+# Outlook on the web — unresolved compatibility
 
-> Inherited user goal (from [plan-lan-login-handoff.md](plan-lan-login-handoff.md)):
-> enable one person to use Microsoft 365 / Outlook on the web from a Linux client
-> using the Mac host's existing Okta session.
+## Current outcome
 
-## Scope
+A separately authorized real-account Case 2 probe copied bounded Outlook state into an isolated client. The client then requested authentication at `https://login.microsoftonline.com`. The request was blocked, and the experiment stopped as agreed. No sign-in/MFA flow was completed and no broader identity-provider credentials were copied.
 
-This record covers **Outlook on the web** — the mail + calendar web app at
-`outlook.office.com` and `outlook.office365.com`. Microsoft Teams on the
-web, SharePoint on the web, and any native Outlook client are **not** in scope
-per the parent plan.
+**This does not establish a complete handoff.** The client account was not independently verified, and neither client-refresh success nor host-refresh preservation was demonstrated. The live host still showed its mailbox UI without a visible authentication prompt; it was not refreshed. The isolated client was closed and its temporary browser state removed.
 
-## What this record is — and what it is not
+Detailed non-secret evidence: [real-outlook-transport-experiment.json](real-outlook-transport-experiment.json).
 
-This record is a **public-doc-sourced summary of constraints**, not a contract
-or implementation spec. Every concrete cookie name, state value, or
-behavioral claim is either:
+## Authorization and environment
 
-- cited to a public document already loaded into
-  [research-auth-compatibility.md](research-auth-compatibility.md), or
-- marked **unresolved — observation required**.
+- The user identified `outlook.live.com` as a disposable consumer account and the open `outlook.office365.com` tab as the real account.
+- The user first authorized passive inspection, then explicitly chose real-account session transport instead of a trial, with an immediate stop on logout or re-authentication.
+- The user authorized a corrected probe after an initial guard stopped an unidentified off-origin redirect. No authentication rejection had been established by that first stop.
+- Observed browser: Chromium 151.0.7922.173 on Arch Linux. The receiving client was a fresh isolated context in the same browser, not the planned remote Mac/Linux peer.
+- No whole-profile export, mailbox-message inspection, IdP-cookie transfer, device-key copying, provider logout, policy change, or MFA completion was performed.
+- This was a temporary local DevTools feasibility probe, **not extension/WebRTC authentication transport**.
 
-There is no live-browser observation in this session. Every verdict in the
-six-row matrix is therefore `unresolved`. Naming cookies, naming storage keys,
-naming JWT claims, or asserting specific user-visible behaviors without an
-observation is **disallowed** at this stage and will be removed if it
-appears.
+## Observed application state
 
-## Source-derived constraints (cited)
+The host contained one MSAL account and one client-application ID. One unexpired cached access token had an Outlook audience and no `cnf` claim. That observation alone does not prove portability or rule out server-side conditional access.
 
-The cited public-doc constraints are summarized in
-[research-auth-compatibility.md §Hard limits and conditional blockers](research-auth-compatibility.md).
-Each constraint below states the source category and the property the
-implementation must respect, without naming cookies or values:
+Observed source cookies included HttpOnly `OIDC`, `UC`, and `OWAAppIdType`; other selected Outlook cookies were `ClientId`, `x-ocditid`, `DefaultAnchorMailbox`, and `msal.cache.encryption`. Cookie values were never written to artifacts or tool output.
 
-| # | Constraint category | Source | Property a contract must respect |
-|---|---|---|---|
-| C1 | Okta FastPass is device-bound on the receiving device | Okta FastPass docs | A client lacking the enrolled key cannot complete a FastPass-only flow. Any contract depending on FastPass must pause for explicit human completion or classify `unsupported`. |
-| C2 | Microsoft Entra ID issues its own session, distinct from Okta | Okta + Entra docs | Okta success alone does not satisfy the Outlook target. The contract must include the Okta → Outlook round-trip. |
-| C3 | Microsoft 365 Continuous Access Evaluation (CAE) re-evaluates policy on receiving IP/device | Entra docs | A successful cookie transfer may still trigger re-auth or device-compliance check on the receiving client. |
-| C4 | Microsoft Token Protection browser preview is scoped to specific ARM web apps | Entra Token Protection docs | Do not generalize Token Protection to all Microsoft 365 web apps. Outlook web is not in that preview's coverage. |
-| C5 | Outlook web uses both `outlook.office.com` and `outlook.office365.com` | Outlook web docs | A contract that targets only one origin will fail on the other. |
-| C6 | Microsoft sign-in frequency and persistent-browser-session policy can re-auth the receiving client | Entra docs | Observed duration is required; the contract must record the actual re-auth interval, not assume infinite lifetime. |
+The `OIDC` values on the two legacy Outlook hostnames matched in local memory. The source had no cookies for `outlook.cloud.microsoft` at inspection time. Observed MSAL index names used the `msal.3` namespace; an early probe omitted those indexes and was corrected before the canonical-origin probe.
 
-The implementation may NOT add cookie names, header values, or origin-storage
-keys here. Those belong in Phase 6 after live observation resolves which of
-C1–C6 actually applies to the user's tenant.
+## Canonical-domain correction
 
-## Candidate state categories (general only)
+The client navigation actually followed:
 
-For an authenticated Outlook view to render on a receiving client, the
-client must possess **at least one** of:
+`outlook.office365.com` → `outlook.cloud.microsoft`
 
-- **Replayed session**: cookies at `outlook.office.com` and `outlook.office365.com`
-  that the server accepts. **No specific cookie names are named here.**
-- **Replayed origin storage**: localStorage / sessionStorage / IndexedDB at the
-  Outlook origin. **No specific keys are named here.**
-- **Refreshed session**: a fresh OAuth round-trip on the receiving client that
-  yields a new browser-side token. May require interactive consent.
+The first single-origin guard failed to retain the blocked destination. The corrected trace established the canonical Outlook redirect, **not an authentication failure**. [Microsoft's domain-migration documentation](https://learn.microsoft.com/en-us/microsoft-365/enterprise/cloud-microsoft-domain?view=o365-worldwide) confirms that Outlook is moving to `cloud.microsoft`. An Outlook implementation must account for this exact hostname rather than relying only on the legacy `.com` hosts. This is not permission for a wildcard Microsoft-domain grant.
 
-HttpOnly visibility does not establish portability across machines; same-origin
-partitioning can defeat naive cookie transfer; FastPass / device-bound factors
-can defeat refresh-token replay.
+## Final candidate and result
 
-## Manifest state today
+The isolated canonical-origin probe used:
 
-The current extension manifest contains no `cookies` permission. A contract that
-relies on `chrome.cookies` API access at Outlook / Entra origins cannot
-proceed without manifest changes in a later phase. This is recorded here
-because Phase 3 must surface the prerequisite, not silently assume it.
+- Nine selected cookie records from the two legacy Outlook origins, preserving their attributes and expiry.
+- Three experimental canonical-host mappings: `OIDC`, `ClientId`, and `msal.cache.encryption` from the source Outlook origin to `outlook.cloud.microsoft`.
+- Six matching local-storage entries: the Outlook access-token entry, matching ID-token/account/active-account entries, and filtered account/token indexes.
+- No refresh token; no Graph, Teams, SharePoint, or Okta credential entries; no IndexedDB/device-key export.
 
-## Verdict (this application, both cases)
+The client reached `outlook.cloud.microsoft`, and the probe's own marker confirmed that the six cache entries were installed. Two selected Outlook service responses returned HTTP 2xx; response semantics and the client account were not independently established by those status codes. The client then made a non-discovery authentication request to `login.microsoftonline.com`. The guard blocked it and disabled further client traffic.
 
-- **Case 1** (host has no Outlook session; sign in via app → Okta → app):
-  **unresolved**. The compatibility record cannot be authored from public docs
-  alone because the user-specific Entra tenant policy (CA policy, FastPass
-  availability, sign-in frequency, persistent browser session setting) is
-  required to determine whether the contract is `supported` or
-  `unsupported`.
-- **Case 2** (host already has Outlook session):
-  **unresolved**. Same dependency on user-specific policy. Public docs do
-  not establish whether a cookie + origin-storage replay is sufficient across
-  a Microsoft 365 tenant with default CA + sign-in-frequency policy.
+A visible sign-in/MFA prompt, exact tenant policy cause, and ultimate silent-auth outcome were **not** observed because the request was blocked. Do not describe this as a confirmed forced host logout, a proven MFA requirement, a supported handoff, or a universal impossibility.
 
-## Live-browser rows (required to resolve)
+## Remaining contract gaps
 
-- [ ] Case 1, disposable tenant: navigate host Chrome to
-      `outlook.office.com`, complete Entra sign-in, complete the handoff
-      attempt on the client, observe whether the client inbox renders
-      after `F5`. Record non-secret before/after states, observed duration
-      before any CAE re-auth, and any interactive prompts.
-- [ ] Case 2, same disposable tenant, host already signed in: skip the
-      Entra prompt path and attempt direct replay; record the same outcomes.
-- [ ] Real tenant: separately authorized observation; not extrapolated
-      from disposable. Record the same outcomes plus the live CA policy and
-      whether FastPass / device compliance blocked the handoff.
+| Requirement | Evidence / gap |
+|---|---|
+| Case 1: normal host SSO followed by handoff | Not attempted; persistent host was never logged out to manufacture this state. |
+| Case 2: existing host application session | Bounded candidate transferred; stopped at identity-provider authentication. Unresolved. |
+| Minimum transferable state | Candidate identified, but necessity/sufficiency is not proved. |
+| Account isolation | Source token/account/tenant checked in memory; final client identity not independently verified. |
+| Host preservation | Existing mailbox UI remained present without a prompt; refresh and longer-term preservation not tested. |
+| Expiry and renewal | Not tested. No refresh token was copied. |
+| Cross-machine operation | Not tested for authentication. Earlier synthetic peer transport is separate evidence. |
+| Chrome extension permissions/APIs | Temporary probe used CDP. Manifest remains `storage`, `tabs`, `offscreen`; no application controller or cookie permission was added. |
+
+## Source constraints retained
+
+Existing [authentication research](research-auth-compatibility.md) records that Okta device-bound factors cannot be copied, Entra sessions are distinct from Okta sessions, and conditional access/CAE or sign-in-frequency policies may require receiving-device authentication. The probe did not identify which policy, if any, caused the observed request.
+
+[MSAL caching documentation](https://learn.microsoft.com/en-us/entra/msal/javascript/browser/caching) explains the session encryption cookie, cache-version coexistence, and IndexedDB/memory storage of proof-of-possession keys. It recommends MSAL APIs rather than application logic coupled to internal cache entities. The temporary cache manipulation is therefore an experiment, not a supported permanent integration contract.
 
 ## Decision
 
-The six Outlook verdicts are all **unresolved**. No implementation contract
-is authored at this stage. Phase 6 is not authorized to begin against
-unresolved verdicts; it waits on the live-browser rows above.
-
-This record contains no cookie names, no JWT claim names, no session-storage
-key names, and no behavior claims attributed to "observed" — because no
-observation has occurred in this session.
+Both Outlook cases remain **unresolved**. The bounded experiment is finished at the user's stop boundary. Do not retry this real account, complete identity-provider authentication, widen credential scope, or implement a permanent controller on the strength of this partial result without a new user decision and a complete verified contract.

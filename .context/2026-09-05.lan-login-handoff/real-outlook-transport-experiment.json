@@ -1,0 +1,324 @@
+{
+  "status": "completed",
+  "date": "2026-09-05",
+  "authorization": "User authorizes real Outlook existing-session transport to own client; stop immediately on logout or re-authentication on either side. No MFA completion, automatic retries, policy changes, device-proof copying or IdP-wide export.",
+  "phase": "stopped-at-identity-provider-authentication",
+  "observedMetadata": {
+    "origin": "https://outlook.office365.com",
+    "scriptVisibleCookieMetadata": [
+      {
+        "name": "MicrosoftApplicationsTelemetryDeviceId",
+        "domain": null,
+        "path": "/mail/inbox/id",
+        "secure": false,
+        "sameSite": "lax",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "MicrosoftApplicationsTelemetryFirstLaunchTime",
+        "domain": null,
+        "path": "/mail/inbox/id",
+        "secure": false,
+        "sameSite": "lax",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "MicrosoftApplicationsTelemetryDeviceId",
+        "domain": null,
+        "path": "/mail",
+        "secure": false,
+        "sameSite": "lax",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "MicrosoftApplicationsTelemetryFirstLaunchTime",
+        "domain": null,
+        "path": "/mail",
+        "secure": false,
+        "sameSite": "lax",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "ClientId",
+        "domain": null,
+        "path": "/",
+        "secure": true,
+        "sameSite": "none",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "x-ocditid",
+        "domain": null,
+        "path": "/",
+        "secure": true,
+        "sameSite": "lax",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "msal.cache.encryption",
+        "domain": null,
+        "path": "/",
+        "secure": true,
+        "sameSite": "none",
+        "partitioned": false,
+        "persistent": false
+      },
+      {
+        "name": "MSFPC",
+        "domain": null,
+        "path": "/",
+        "secure": true,
+        "sameSite": "none",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "SuiteServiceProxyKey",
+        "domain": null,
+        "path": "/",
+        "secure": true,
+        "sameSite": "none",
+        "partitioned": false,
+        "persistent": true
+      },
+      {
+        "name": "DefaultAnchorMailbox",
+        "domain": null,
+        "path": "/",
+        "secure": true,
+        "sameSite": "none",
+        "partitioned": false,
+        "persistent": true
+      }
+    ],
+    "msalLocalStorageValueShapes": {
+      "cachedAt,clientId,credentialType,environment,expiresOn,homeAccountId,realm,secret,target": 18,
+      "accessToken,idToken,refreshToken": 1,
+      "array": 1,
+      "clientId,credentialType,environment,expiresOn,homeAccountId,secret": 1,
+      "number": 1,
+      "clientId,credentialType,environment,homeAccountId,realm,secret": 1,
+      "non-json": 1,
+      "homeAccountId,localAccountId": 1,
+      "authorityType,environment,homeAccountId,localAccountId,realm,tenantProfiles,username": 1
+    },
+    "limitations": "HttpOnly cookies excluded; no cookie/storage values returned"
+  },
+  "interpretation": "The bounded feasibility experiment copied scoped Outlook state into an isolated same-browser client, including the observed MSAL cache indexes and three canonical-host cookie mappings. The canonical client imported the cache and returned two 2xx responses from selected Outlook service endpoints, but then requested login.microsoftonline.com authentication. The request was blocked and the experiment stopped. No visible MFA completion, identity-provider session transfer or retry after this boundary. Authenticated client identity and refresh-based host preservation were not proved; compatibility remains unresolved.",
+  "secretHandling": "Values were read into the supervised local process and copied into an isolated browser context via loopback CDP. No raw values were returned in tool output, logged or saved in artifacts. Client contexts were removed and the process stopped; no profile/HAR exports retained.",
+  "sessionTransferAttempted": true,
+  "clientContextCreated": true,
+  "hostNavigationPerformed": false,
+  "debuggerState": "All isolated clients removed; inspector stopped. No running credential-copy helper remains.",
+  "next": "User paused Outlook and requested Slack. Use the report for later resumption; obtain a new decision before another real-Outlook attempt.",
+  "proofBoundary": "Same-machine isolated-client feasibility will not prove cross-machine WebRTC transfer.",
+  "helper": "Temporary credential-redacting script /tmp/beam-outlook-inspector.mjs; no credentials embedded.",
+  "httpOnlyCookieMetadata": {
+    "ok": true,
+    "phase": "cookie_metadata",
+    "cookies": [
+      {
+        "name": "MSFPC",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": false,
+        "sameSite": "None",
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "OWAAppIdType",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "None",
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "ClientId",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": false,
+        "sameSite": "None",
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "OIDC",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "None",
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "msal.cache.encryption",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": false,
+        "sameSite": "None",
+        "session": true,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "UC",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": true,
+        "sameSite": "None",
+        "session": true,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "x-ocditid",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": false,
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "DefaultAnchorMailbox",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": false,
+        "sameSite": "None",
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      },
+      {
+        "name": "SuiteServiceProxyKey",
+        "domain": "outlook.office365.com",
+        "path": "/",
+        "secure": true,
+        "httpOnly": false,
+        "sameSite": "None",
+        "session": false,
+        "expired": false,
+        "partitioned": false
+      }
+    ]
+  },
+  "msalSource": {
+    "url": "https://learn.microsoft.com/en-us/entra/msal/javascript/browser/caching",
+    "findings": [
+      "MSAL v4 can encrypt localStorage auth artifacts with a base key held in msal.cache.encryption session cookie.",
+      "Cache may contain multiple library-version generations; copying arbitrary cache entries is not a supported MSAL integration.",
+      "Proof-of-possession keys can live in IndexedDB/memory; these must not be copied to fake device proof."
+    ]
+  },
+  "outcome": {
+    "verdict": "unresolved",
+    "stopReason": "client_requested_identity_provider_authentication",
+    "blockedOrigin": "https://login.microsoftonline.com",
+    "cookieRecordsInstalled": 12,
+    "cacheEntriesInstalled": 6,
+    "clientAuthenticatedIdentityVerified": false,
+    "hostMailboxUiPresent": true,
+    "hostAuthenticationPromptObserved": false,
+    "hostRefreshed": false,
+    "clientRemoved": true,
+    "inspectorStopped": true
+  },
+  "retryAuthorization": "User selected Retry corrected probe after the unidentified redirect. Corrected tracing identified a normal redirect to outlook.cloud.microsoft; official Microsoft domain-migration documentation confirms Outlook there. Continue only within the exact Outlook application origins, never sign-in endpoints.",
+  "canonicalDomainEvidence": {
+    "observedRedirect": [
+      "https://outlook.office365.com",
+      "https://outlook.cloud.microsoft"
+    ],
+    "source": "https://learn.microsoft.com/en-us/microsoft-365/enterprise/cloud-microsoft-domain?view=o365-worldwide",
+    "legacyOidcValuesEqual": true,
+    "sourceCanonicalCookiesPresent": false,
+    "cacheNamespaceObserved": "msal.3",
+    "candidateMapping": "In isolated client only, map source Outlook OIDC, ClientId, and msal.cache.encryption cookies to the verified canonical Outlook hostname; preserve cookie attributes and expiry. No other cloud.microsoft host permitted."
+  },
+  "correctedLegacyAttempt": {
+    "cookieCount": 9,
+    "cacheEntriesPrepared": 6,
+    "cacheInstallationConfirmed": false,
+    "stopReason": "client_left_scoped_outlook_origin",
+    "blockedOrigin": "https://outlook.cloud.microsoft",
+    "signInRequestObserved": false,
+    "hostMailboxUiStillPresent": true,
+    "clientRemoved": true
+  },
+  "finalAttempt": {
+    "ok": true,
+    "stopped": true,
+    "stopReason": "client_requested_identity_provider_authentication",
+    "blockedDestination": {
+      "origin": "https://login.microsoftonline.com",
+      "identityProvider": true,
+      "logoutPath": false
+    },
+    "authenticationFailure": null,
+    "attempted": true,
+    "clientCreated": true,
+    "clientOrigin": "https://outlook.cloud.microsoft",
+    "navigationOrigins": [
+      "https://outlook.office365.com",
+      "https://outlook.cloud.microsoft"
+    ],
+    "clientCacheImported": true,
+    "transferred": {
+      "cookieCount": 12,
+      "cacheEntriesPrepared": 6,
+      "cacheInstallationConfirmed": true,
+      "accessTokenCount": 1,
+      "refreshTokenCount": 0,
+      "scope": "Outlook-only"
+    },
+    "authenticatedServiceResponses": 2,
+    "accountMatchesHost": null,
+    "hostOrigin": "https://outlook.office365.com",
+    "hostView": {
+      "main": true,
+      "inbox": true,
+      "authenticationPrompt": false
+    }
+  },
+  "initialLegacyOutcome": {
+    "status": "unresolved",
+    "cookieCountInstalled": 7,
+    "cacheEntriesPrepared": 4,
+    "cacheEntryInstallationVerified": false,
+    "accessTokenCandidates": 1,
+    "refreshTokensCopied": 0,
+    "stopReason": "client_left_scoped_outlook_origin",
+    "blockedDestination": "not retained by first probe; unrecoverable from navigation history, frame tree or buffered browser logs",
+    "reauthenticationObserved": false,
+    "reauthenticationRuledOut": false,
+    "hostMailboxUiStillPresent": true,
+    "hostAuthenticationPromptObserved": false,
+    "hostRefreshed": false,
+    "clientAuthenticated": false,
+    "clientRemoved": true,
+    "hostLogoutInvoked": false
+  },
+  "completedAt": "2026-09-06T00:43:47Z",
+  "report": "research-outlook-session-transport.md"
+}
