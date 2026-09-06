@@ -62,6 +62,14 @@ The user has separated the development proof of concept from the eventual shippe
 - Provider-required MFA, consent, or other interactive security checks remain separate from extension pairing and still require explicit human completion.
 - Application/account grant scope, the eventual pairing mechanism, and unpairing/revocation behavior remain unresolved. This records product scope only; it does not implement or expose a service.
 
+### Authorization boundary
+
+- **Two permissions are required.** Owning the browser/device and being able to sign into an account are necessary but not sufficient. For any organization-managed service, live session migration requires documented authorization from the service or organization owner for the exact account, tenant/workspace, device set and migration mechanism.
+- **Pairing is device trust, not account authority.** A paired client may send a request but pairing never authorizes copying an application session. Missing, ambiguous or revoked authorization is a fail-closed `unsupported` result.
+- **Provider controls remain authoritative.** MFA, consent, device binding, conditional access, concurrent-session limits, reauthentication, sign-in alerts and a provider rejection are boundaries to honor, not defects to work around.
+- **No-pairing is test-only.** The internal-LAN development exception may carry synthetic traffic or disposable-account tests only. It never permits transfer of real personal, employer, customer or enterprise authentication state.
+- **No concealment objective.** The product must not hide a client device, suppress security alerts, evade monitoring, impersonate another person or make a provider believe that the client is the host.
+
 ## Proposed host–client workflows
 
 This is an iteration of the existing brainstorm, not an implementation plan or a claim of working integrations. The user now prefers an application-first approach: control the host browser to sign into the target app through normal Okta SSO when necessary, rather than making general Okta-session portability the primary design. This is a preferred direction to investigate, not proof that application-session sharing is easier or feasible.
@@ -137,13 +145,12 @@ Working direction: one `sync auth` action requests access to the named applicati
 - **Later session expiry:** the service remains authoritative. Continuous background synchronization is not part of the agreed scope.
 - **Scope and lifecycle:** no whole-profile sharing, traffic proxying, forced host logout, or promise that disconnecting the extension revokes all provider sessions.
 
-### Okta false-positive hypothesis
+### Security monitoring and provider controls
 
-- The user suggests that authenticating the application in the already-authenticated host browser might circumvent or prevent false-positive detection by Okta. This is a hypothesis, not an observed outcome or an established property of the design.
-- [INFERENCE] Reusing an acceptable host Okta session may reduce repeated login prompts on the host. That is different from establishing that cross-machine application access causes fewer security alerts.
-- Existing research documents configurable Okta session reevaluation and independent application/Microsoft Entra controls. Normal host-side SSO can still be evaluated, and client access is not guaranteed to be invisible or exempt from policy. No tenant-specific detection behavior has been tested.
-- The design rationale is normal host-side sign-in and application-scoped access, not evasion of monitoring or enforcement. Required authentication/device checks remain boundaries, not obstacles for the extension to hide or bypass.
-- If false positives are investigated later, compare non-secret outcomes and the actual configured policy with the service owner. Do not promise alert suppression or reinterpret a legitimate enforcement decision as a false positive without evidence.
+- The design rationale is bounded, user-authorized application access—not avoiding or altering provider or organization security monitoring.
+- A normal host-side sign-in may reduce a prompt on the host, but it does not establish client trust, avoid a required client check, or authorize the client session.
+- Required MFA, consent, device proof, conditional access, session limits, reauthentication, alerts and enforcement decisions remain authoritative. The client must pause for explicit human completion or report the requested flow unsupported.
+- Any investigation of an alert must compare non-secret outcomes with the service owner. It must never seek alert suppression, device-fingerprint concealment, policy circumvention or a reinterpretation of legitimate enforcement as a false positive.
 
 ## Open questions
 

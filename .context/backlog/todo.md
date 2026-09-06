@@ -6,6 +6,12 @@ status: active
 
 - [ ] [Phase 1: Record experiment boundary](items/phase-1-experiment-boundary.md)
 
+## Authorization prerequisite
+
+- [ ] [Enforce owner authorization before enterprise session transfer](items/enforce-enterprise-owner-authorization.md)
+
+No further real organization-managed session export or replay may proceed until this high-priority precondition is met. It applies independently of phase order.
+
 ## Upcoming phases
 
 - [ ] [Phase 2: Prove extension-only transport](items/phase-2-extension-transport-gate.md)
