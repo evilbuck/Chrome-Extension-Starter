@@ -1,0 +1,359 @@
+{
+  "version": 2,
+  "targets": {
+    "coverage_min": 60,
+    "coverage_target": 75,
+    "cyclomatic_max": 10,
+    "cyclomatic_hard_ceiling": 15,
+    "patch_coverage_min": 90
+  },
+  "ratchet": {
+    "baseline_coverage": 64.48,
+    "baseline_complexity_inventory": [
+      {
+        "file": "src/background/apps/slack.ts",
+        "function": "cleanOwnedConfig",
+        "complexity": 18
+      },
+      {
+        "file": "src/background/apps/slack.ts",
+        "function": "cleanupPending",
+        "complexity": 26
+      },
+      {
+        "file": "src/background/apps/slack.ts",
+        "function": "inspectPage",
+        "complexity": 27
+      },
+      {
+        "file": "src/background/apps/slack.ts",
+        "function": "checkDestination",
+        "complexity": 15
+      },
+      {
+        "file": "src/background/apps/slack.ts",
+        "function": "onUpdated",
+        "complexity": 11
+      },
+      {
+        "file": "src/background/apps/slack.ts",
+        "function": "applySlackSession",
+        "complexity": 11
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "isPairingSnapshot",
+        "complexity": 21
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "isOffscreenEventPayload",
+        "complexity": 21
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "handlePairingStorage",
+        "complexity": 15
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "asPairingResult",
+        "complexity": 11
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "sendSlackPeer",
+        "complexity": 14
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "handleSlackList",
+        "complexity": 12
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "(anonymous)",
+        "complexity": 15
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "handleRequestStart",
+        "complexity": 11
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "handleAppInbound",
+        "complexity": 21
+      },
+      {
+        "file": "src/background/connection.ts",
+        "function": "(anonymous)",
+        "complexity": 28
+      },
+      {
+        "file": "src/background/request.ts",
+        "function": "disposeAndFail",
+        "complexity": 15
+      },
+      {
+        "file": "src/background/request.ts",
+        "function": "completeRequest",
+        "complexity": 12
+      },
+      {
+        "file": "src/components/tailgrids/core/select.tsx",
+        "function": "SelectContent",
+        "complexity": 19
+      },
+      {
+        "file": "src/offscreen/index.ts",
+        "function": "(anonymous)",
+        "complexity": 15
+      },
+      {
+        "file": "src/offscreen/index.ts",
+        "function": "handleInboundPeerMessage",
+        "complexity": 13
+      },
+      {
+        "file": "src/offscreen/index.ts",
+        "function": "(anonymous)",
+        "complexity": 56
+      },
+      {
+        "file": "src/offscreen/identity-storage.ts",
+        "function": "isIdentityRecord",
+        "complexity": 12
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "handleCommand",
+        "complexity": 11
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "cancelAttempt",
+        "complexity": 15
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "forgetPair",
+        "complexity": 11
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "asRoomCredentials",
+        "complexity": 16
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "handlePaired",
+        "complexity": 16
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "sendLocalOffer",
+        "complexity": 13
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "handleRemoteSignal",
+        "complexity": 26
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "(anonymous)",
+        "complexity": 16
+      },
+      {
+        "file": "src/offscreen/pairing.ts",
+        "function": "asServerMessage",
+        "complexity": 28
+      },
+      {
+        "file": "src/pages/options/index.tsx",
+        "function": "RoleConfigCard",
+        "complexity": 14
+      },
+      {
+        "file": "src/pages/slack/request-panel.tsx",
+        "function": "parseRequest",
+        "complexity": 19
+      },
+      {
+        "file": "src/pages/slack/request-panel.tsx",
+        "function": "(anonymous)",
+        "complexity": 11
+      },
+      {
+        "file": "src/pages/slack/request-panel.tsx",
+        "function": "(anonymous)",
+        "complexity": 14
+      },
+      {
+        "file": "src/pages/slack/request-panel.tsx",
+        "function": "hydrate",
+        "complexity": 16
+      },
+      {
+        "file": "src/pages/slack/request-panel.tsx",
+        "function": "SlackRequestPanel",
+        "complexity": 39
+      },
+      {
+        "file": "src/pages/pairing/pairing-panel.tsx",
+        "function": "asTransport",
+        "complexity": 21
+      },
+      {
+        "file": "src/pages/pairing/pairing-panel.tsx",
+        "function": "PairingPanel",
+        "complexity": 32
+      },
+      {
+        "file": "src/shared/lib/envelope.ts",
+        "function": "parseDescriptorFields",
+        "complexity": 19
+      },
+      {
+        "file": "src/shared/lib/envelope.ts",
+        "function": "parseRequestPayload",
+        "complexity": 12
+      },
+      {
+        "file": "src/shared/lib/envelope.ts",
+        "function": "parseResponsePayload",
+        "complexity": 16
+      },
+      {
+        "file": "src/shared/lib/envelope.ts",
+        "function": "parsePeer",
+        "complexity": 25
+      },
+      {
+        "file": "src/shared/lib/peer.ts",
+        "function": "channel.onmessage",
+        "complexity": 13
+      },
+      {
+        "file": "src/shared/lib/slack.ts",
+        "function": "isSlackTeam",
+        "complexity": 19
+      },
+      {
+        "file": "src/shared/lib/slack.ts",
+        "function": "isSlackSession",
+        "complexity": 37
+      },
+      {
+        "file": "src/shared/lib/pairing-protocol.ts",
+        "function": "isPairingCommand",
+        "complexity": 17
+      },
+      {
+        "file": "services/pairing/test/pairing.test.ts",
+        "function": "pairSession",
+        "complexity": 12
+      },
+      {
+        "file": "services/pairing/test/pairing.test.ts",
+        "function": "(anonymous)",
+        "complexity": 13
+      },
+      {
+        "file": "services/pairing/src/validate.ts",
+        "function": "parseProof",
+        "complexity": 14
+      },
+      {
+        "file": "services/pairing/src/http.ts",
+        "function": "statusOf",
+        "complexity": 11
+      },
+      {
+        "file": "services/pairing/src/http.ts",
+        "function": "readJsonObject",
+        "complexity": 14
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "join",
+        "complexity": 14
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "fetch",
+        "complexity": 22
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "webSocketMessage",
+        "complexity": 16
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "webSocketClose",
+        "complexity": 11
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "handleConfirm",
+        "complexity": 18
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "handleSignal",
+        "complexity": 24
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "tryPair",
+        "complexity": 15
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "greet",
+        "complexity": 13
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "failClosed",
+        "complexity": 13
+      },
+      {
+        "file": "services/pairing/src/pair-room.ts",
+        "function": "verifyMembershipProof",
+        "complexity": 15
+      },
+      {
+        "file": "services/pairing/src/index.ts",
+        "function": "handle",
+        "complexity": 15
+      }
+    ],
+    "complexity_baseline_file": null,
+    "baseline_lint_clean": false
+  },
+  "ecosystems": [
+    {
+      "name": "typescript",
+      "detected": true,
+      "test_runner": "vitest run",
+      "coverage_tool": "vitest run --coverage --coverage.reporter=lcov",
+      "coverage_format": "lcov",
+      "complexity_tool": "lizard",
+      "complexity_cmd": "lizard -C 10 -w --csv -x \"*/.git/*\" -x \"*/.context/*\" -x \"*/.venv/*\" -x \"*/coverage/*\" -x \"*/dist/*\" -x \"*/build/*\" -x \"*/node_modules/*\" -x \"*/vendor/*\" -x \"*/target/*\" -x \"*/.next/*\" -x \"*/.nuxt/*\" -x \"*/.turbo/*\" .",
+      "lint_cmd": "biome check",
+      "lint_accepts_paths": true,
+      "functional_test_cmd": null,
+      "configured_not_installed": [],
+      "detection_signals": [
+        "package.json",
+        "tsconfig.json",
+        "*.ts"
+      ]
+    }
+  ],
+  "git_compare_branch": "origin/master",
+  "complexity_baseline": []
+}
