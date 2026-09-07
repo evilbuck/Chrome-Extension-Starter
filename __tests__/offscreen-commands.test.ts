@@ -40,17 +40,19 @@ const slackSource = {
 const harness = vi.hoisted(() => {
     const sendRequest = vi.fn();
     const sendReply = vi.fn();
-    const handleCommand = vi.fn(async (_command: unknown) => ({
-        ok: true as const,
-        pairing: {
-            phase: 'connected' as const,
-            code: null as string | null,
-            expiresAt: null as number | null,
-            pending: null,
-            pair: null,
-            error: null
-        }
-    }));
+    const handleCommand = vi.fn(
+        async (_command: unknown): Promise<{ ok: true; pairing: PairingSnapshot }> => ({
+            ok: true,
+            pairing: {
+                phase: 'connected',
+                code: null,
+                expiresAt: null,
+                pending: null,
+                pair: null,
+                error: null
+            }
+        })
+    );
     const state = {
         connectionId: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
         role: 'client' as 'host' | 'client' | null,

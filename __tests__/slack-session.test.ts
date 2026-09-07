@@ -126,6 +126,23 @@ describe('Slack session boundary', () => {
     });
 });
 
+type TabStub = {
+    id?: number;
+    url?: string;
+    status?: string;
+    incognito?: boolean;
+};
+
+type CookieStub = {
+    name: string;
+    value: string;
+    domain?: string;
+    path?: string;
+    httpOnly?: boolean;
+    secure?: boolean;
+    session?: boolean;
+};
+
 const browserFixture = (existing = false) => {
     vi.stubGlobal('crypto', webcrypto);
     const appStorage = new Map<string, string>();
@@ -143,12 +160,18 @@ const browserFixture = (existing = false) => {
     const cookieJar = new Map<string, string>(existing ? [['d', 'existing-client-session']] : []);
     const openTabs = new Set<number>();
     const tabs = {
-        query: vi.fn(async () => []),
-        create: vi.fn(async () => {
+        query: vi.fn(async (): Promise<TabStub[]> => []),
+        create: vi.fn(async (): Promise<TabStub> => {
             openTabs.add(7);
             return { id: 7, url: SLACK_STAGING_URL };
         }),
-        get: vi.fn(async () => ({ id: 7, url: SLACK_STAGING_URL, status: 'complete' })),
+        get: vi.fn(
+            async (_id: number): Promise<TabStub> => ({
+                id: 7,
+                url: SLACK_STAGING_URL,
+                status: 'complete'
+            })
+        ),
         remove: vi.fn(async (id: number) => {
             openTabs.delete(id);
         }),
@@ -158,10 +181,11 @@ const browserFixture = (existing = false) => {
         onRemoved: { addListener: vi.fn(), removeListener: vi.fn() }
     };
     const cookies = {
-        getAll: vi.fn(async () =>
-            [...cookieJar].map(([name, value]) => ({ name, value, domain: '.slack.com', path: '/' }))
+        getAll: vi.fn(
+            async (): Promise<CookieStub[]> =>
+                [...cookieJar].map(([name, value]) => ({ name, value, domain: '.slack.com', path: '/' }))
         ),
-        set: vi.fn(async (cookie: { name: string; value: string }) => {
+        set: vi.fn(async (cookie: { name: string; value: string }): Promise<CookieStub | undefined> => {
             cookieJar.set(cookie.name, cookie.value);
             return cookie;
         }),
