@@ -137,3 +137,78 @@ If a check fails, re-verify before escalating:
 3. If it fails again, treat it as a real failure and act on the verdict.
 
 <!-- END b-init-guardrails -->
+
+## Development commands
+
+Package manager is **bun** (1.4+, pinned via mise; `packageManager` in `package.json`). pnpm is removed.
+
+| Task | Command |
+|---|---|
+| Install deps | `bun install` |
+| Dev build | `bun run build` |
+| Prod build | `bun run build:prod` |
+| Watch | `bun run build:watch` (MV3: no HMR — rebuild, then reload the unpacked extension and the eBay tab) |
+| Unit tests | `bun run test` |
+| Tests + coverage | `bun run test:cov` |
+| Lint / autofix | `bun run lint` / `bun run lint:fix` |
+| Typecheck | `bun run typecheck` |
+| Chrome Web Store zip | `bun run package` → `releases/ebay-enhance-v<version>.zip` |
+<!-- BEGIN chrome-devtools-mcp -->
+# Chrome DevTools MCP (for this project)
+
+The OMP runtime hosts `chrome-devtools-mcp` (v1.9.0, fetched 2026-09-08) as an MCP
+server. It drives a Chromium instance for live debugging of the extension.
+
+## Launch behavior
+
+Auto-launches a persistent Chromium instance under OMP on first MCP tool call:
+
+| Setting | Value | Why |
+|---|---|---|
+| `--executable-path` | `/usr/bin/chromium` | Google Chrome not installed on this host |
+| `--user-data-dir` | `~/.cache/chrome-devtools-mcp/chromium-profile` | Logins persist across MCP restarts |
+| `--chrome-arg=--no-sandbox` | required | Omarchy runs Chromium without sandbox by default |
+| `--chrome-arg=--disable-setuid-sandbox` | required | Pair with `--no-sandbox` |
+| `--viewport` | `1280x720` | Popup/options page default viewport |
+
+Config source: `~/.omp/agent/mcp.json` (unmanaged, listed in `.chezmoiignore`).
+
+## Agentic skills (installed)
+
+Location: `~/.omp/agent/managed-skills/`. Pinned at
+`chrome-devtools-mcp-v1.9.0`. Provenance in
+`~/.omp/agent/managed-skills/.provenance/chrome-devtools.json`.
+
+- `chrome-devtools` — Overview / when to use
+- `chrome-devtools-cli` — Shell-based DevTools automation
+- `troubleshooting` — Fix MCP startup/connection failures (per get-started doc)
+- `debug-optimize-lcp` — Core Web Vitals debugging (most relevant for popup/options).
+
+Skipped for now: `a11y-debugging`, `cookie-debugging`, `memory-leak-debugging`.
+Add by re-running the same tarball extract if needed.
+
+## Known gotcha: Developer mode
+
+For unpacked extension testing under auto-launched Chromium, **Developer mode
+must be enabled at `chrome://extensions`** before `chrome.runtime.reload` —
+otherwise the extension flips to `disableReasons.unsupportedDeveloperExtension=true`
+on reload, and `chrome-extension://.../options.html` fails with
+`ERR_BLOCKED_BY_CLIENT`. (Discovered 2026-09-06 during Slack extension smoke
+test.)
+
+## Updating
+
+```bash
+# Bump version in mcp.json args and refresh skills tarball
+VER="chrome-devtools-mcp-vX.Y.Z"
+mktemp -d && cd "$_" && \
+  curl -sfL "https://codeload.github.com/ChromeDevTools/chrome-devtools-mcp/tar.gz/refs/tags/$VER" -o r.tgz && \
+  tar -xzf r.tgz
+for s in chrome-devtools chrome-devtools-cli troubleshooting debug-optimize-lcp; do
+  rm -rf ~/.omp/agent/managed-skills/$s
+  mkdir -p ~/.omp/agent/managed-skills/$s
+  cp -r "chrome-devtools-mcp-$VER/skills/$s/." ~/.omp/agent/managed-skills/$s/
+done
+```
+
+<!-- END chrome-devtools-mcp -->

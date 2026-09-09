@@ -6,14 +6,11 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-if command -v pnpm >/dev/null 2>&1; then
-    pnpm build:prod
-elif [[ -x ./node_modules/.bin/rsbuild ]]; then
-    ./node_modules/.bin/rsbuild build --mode=production
-else
-    echo "package-extension: pnpm/rsbuild not found. Run pnpm install first." >&2
+if ! command -v bun >/dev/null 2>&1; then
+    echo "package-extension: bun not found. Run bun install first." >&2
     exit 1
 fi
+bun run build:prod
 
 if [[ ! -f dist/manifest.json ]]; then
     echo "package-extension: dist/manifest.json missing after build." >&2

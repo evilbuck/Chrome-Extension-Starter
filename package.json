@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Hide eBay listings you do not want, on search results and item pages.",
   "type": "module",
+  "packageManager": "bun@1.4.2",
   "scripts": {
     "build": "rsbuild build --mode=development",
     "build:prod": "rsbuild build --mode=production",
@@ -45,5 +46,9 @@
     "tailwindcss": "^4.2.2",
     "typescript": "^6.0.2",
     "vitest": "^4.1.4"
-  }
+  },
+  "trustedDependencies": [
+    "@tailwindcss/oxide",
+    "esbuild"
+  ]
 }

@@ -1,4 +1,4 @@
-import type { MSG, MESSAGE_SPEC } from '@/shared/constants';
+import type { MESSAGE_SPEC, MSG } from '@/shared/constants';
 
 export interface HiddenItem {
     id: string;
