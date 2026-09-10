@@ -22,7 +22,6 @@ node_modules
 
 # Logs
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 
 # Coverage directory used by tools like istanbul

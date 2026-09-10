@@ -23,9 +23,14 @@ const mockStorageAreas = {
     }
 };
 
+const mockRuntime = {
+    lastError: undefined as { message: string } | undefined
+};
+
 global.chrome = {
+    runtime: mockRuntime,
     storage: mockStorageAreas
-} as any;
+} as unknown as typeof chrome;
 
 // Test schema
 interface TestSchema {
@@ -163,6 +168,16 @@ describe('createTypedStorage', () => {
             await kv.set('session', 'token', 'xyz789');
 
             expect(mockStorageAreas.session.set).toHaveBeenCalledWith({ token: 'xyz789' }, expect.any(Function));
+        });
+
+        it('rejects when Chrome reports a storage error', async () => {
+            mockStorageAreas.sync.set.mockImplementation((_items, callback) => {
+                mockRuntime.lastError = { message: 'quota exceeded' };
+                callback?.();
+                mockRuntime.lastError = undefined;
+            });
+
+            await expect(kv.set('sync', 'username', 'newuser')).rejects.toThrow('quota exceeded');
         });
     });
 

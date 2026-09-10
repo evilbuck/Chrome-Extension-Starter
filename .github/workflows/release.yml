@@ -37,10 +37,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: latest
+          bun-version: 1.4.2
 
       - name: Setup Node.js v${{ matrix.node-version }}
         uses: actions/setup-node@v6
@@ -48,10 +48,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Build extension
-        run: pnpm run build:prod
+        run: bun run build:prod
 
       - name: Create extension archive
         run: |

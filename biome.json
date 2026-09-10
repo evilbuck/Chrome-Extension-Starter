@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["**", "!**/build", "!**/dist", "!**/pnpm-lock.yaml"]
+    "includes": ["**", "!**/build", "!**/dist", "!**/bun.lock"]
   },
   "formatter": {
     "enabled": true,

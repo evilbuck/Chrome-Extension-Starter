@@ -21,10 +21,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up PNPM
-        uses: pnpm/action-setup@v5
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: latest
+          bun-version: 1.4.2
 
       - name: Set up Node.js v${{ matrix.node-version }}
         uses: actions/setup-node@v6
@@ -32,13 +32,13 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Build
-        run: pnpm build
+        run: bun run build
 
       - name: Run Vitest Coverage
-        run: pnpm test:cov
+        run: bun run test:cov
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v7

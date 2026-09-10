@@ -8,7 +8,7 @@
     "patch_coverage_min": 90
   },
   "ratchet": {
-    "baseline_coverage": 63.65,
+    "baseline_coverage": 82.7,
     "baseline_complexity_inventory": [
       {
         "file": "src/shared/lib/migration.ts",
@@ -53,12 +53,13 @@
     {
       "name": "typescript",
       "detected": true,
-      "test_runner": "vitest run",
-      "coverage_tool": "vitest run --coverage --coverage.reporter=lcov",
+      "test_runner": "bun run test",
+      "coverage_tool": "bun run test:cov",
+      "coverage_tool_note": "Do NOT append --coverage-reporter: vitest 4 rejects the kebab flag (CACError). Run the recorded command as-is; lcov is emitted to coverage/lcov.info via vitest.config.ts reporters.",
       "coverage_format": "lcov",
       "complexity_tool": "lizard",
       "complexity_cmd": "lizard -C 10 -w --csv -x \"*/.git/*\" -x \"*/.context/*\" -x \"*/.venv/*\" -x \"*/coverage/*\" -x \"*/dist/*\" -x \"*/build/*\" -x \"*/node_modules/*\" -x \"*/vendor/*\" -x \"*/target/*\" -x \"*/.next/*\" -x \"*/.nuxt/*\" -x \"*/.turbo/*\" .",
-      "lint_cmd": "biome check",
+      "lint_cmd": "bunx biome check",
       "lint_accepts_paths": true,
       "functional_test_cmd": null,
       "configured_not_installed": [],

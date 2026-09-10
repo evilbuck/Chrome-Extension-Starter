@@ -21,7 +21,7 @@ export default defineConfig({
             // Test coverage options
             enabled: false,
             provider: 'v8',
-            reporter: ['text', 'json', 'html'],
+            reporter: ['text', 'json', 'html', 'lcov'],
             exclude: [...coverageConfigDefaults.exclude]
         },
         typecheck: {
