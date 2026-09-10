@@ -4,7 +4,8 @@ export const FLAGS = {
 
 export const ALARMS = {
     POLL: 'poll',
-    DAILY_CLEANUP: 'daily_cleanup'
+    DAILY_CLEANUP: 'daily_cleanup',
+    HIDDEN_ITEMS_SYNC: 'hidden_items_sync'
 } as const;
 
 export enum MSG {

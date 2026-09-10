@@ -11,6 +11,18 @@ type AreasOf<S> = Extract<keyof S, AllAreas>;
 type ValueOf<T, K extends keyof T> = T[K];
 type StrictPartial<T> = { [K in keyof T]?: T[K] };
 
+const callChrome = <T>(invoke: (callback: (value: T) => void) => void): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+        invoke((value) => {
+            const error = chrome.runtime?.lastError;
+            if (error) {
+                reject(new Error(error.message));
+                return;
+            }
+            resolve(value);
+        });
+    });
+
 // Map area name to chrome.storage bucket
 const areaOf = (area: AllAreas) => {
     switch (area) {
@@ -47,12 +59,12 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
     // implementation
     async function get(area: AllAreas, key: string, fallback?: unknown): Promise<unknown> {
         const bucket = areaOf(area);
-        const result = await new Promise<Record<string, unknown>>((resolve) => {
+        const result = await callChrome<Record<string, unknown>>((done) => {
             // if no fallback provided, query key only (no default injection)
             if (typeof fallback === 'undefined') {
-                bucket.get([key], (v) => resolve(v));
+                bucket.get([key], done);
             } else {
-                bucket.get({ [key]: fallback }, (v) => resolve(v));
+                bucket.get({ [key]: fallback }, done);
             }
         });
 
@@ -72,9 +84,9 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
     // implementation
     async function getAll(area: AllAreas, defaults?: Record<string, unknown>): Promise<Record<string, unknown>> {
         const bucket = areaOf(area);
-        const result = await new Promise<Record<string, unknown>>((resolve) => {
+        const result = await callChrome<Record<string, unknown>>((done) => {
             // Chrome API: get(null/undefined) returns all items
-            bucket.get((defaults ?? undefined) as Record<string, unknown> | null, (v) => resolve(v));
+            bucket.get((defaults ?? undefined) as Record<string, unknown> | null, done);
         });
 
         return result;
@@ -101,7 +113,7 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
             throw new Error('[storage.managed] set is not allowed (read-only by policy).');
         }
         const bucket = areaOf(area);
-        await new Promise<void>((resolve) => bucket.set({ [key]: value }, () => resolve()));
+        await callChrome<void>((done) => bucket.set({ [key]: value }, () => done(undefined)));
     }
 
     // ----------------------------
@@ -121,7 +133,7 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
             throw new Error('[storage.managed] setAll is not allowed (read-only by policy).');
         }
         const bucket = areaOf(area);
-        await new Promise<void>((resolve) => bucket.set(items, () => resolve()));
+        await callChrome<void>((done) => bucket.set(items, () => done(undefined)));
     }
 
     // ----------------------------
@@ -142,7 +154,7 @@ export function createTypedStorage<S extends Partial<Record<AllAreas, Record<str
         }
         const bucket = areaOf(area);
         const keys = Array.isArray(key) ? key : [key];
-        await new Promise<void>((resolve) => bucket.remove(keys, () => resolve()));
+        await callChrome<void>((done) => bucket.remove(keys, () => done(undefined)));
     }
 
     // Watch a single key change with strong typing

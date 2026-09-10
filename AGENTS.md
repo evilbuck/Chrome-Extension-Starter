@@ -212,3 +212,22 @@ done
 ```
 
 <!-- END chrome-devtools-mcp -->
+
+<!-- BEGIN b-docs:conventions -->
+### Conventions
+
+- User-visible writes from content scripts must persist to
+  `chrome.storage.local` immediately — never inside a `setTimeout`
+  debounce. Only the service worker may coalesce (a page reload during
+  the debounce window loses the write).
+- `chrome.storage.sync` items must stay ≤ 8192 bytes UTF-8 **including** a
+  reserved envelope margin (see `splitIndexIntoShards` in
+  `src/shared/hidden-items.ts`). JSON serialization size is not a
+  documented quota contract — shard with margin, don't compute the limit
+  exactly.
+- One-shot fallback alarms stay armed after a successful fast-path run —
+  clearing one races a snapshot scheduled moments later; Chrome discards
+  the later no-op wake by itself.
+- Never call `chrome.alarms.clearAll()` — modules own named alarms; reset
+  only the alarms you own (`resetKnownAlarms` in `src/background/alarms.ts`).
+<!-- END b-docs:conventions -->

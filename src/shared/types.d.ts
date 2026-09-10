@@ -10,6 +10,24 @@ export interface HiddenItem {
 
 export type HiddenItemsMap = Record<string, HiddenItem>;
 
+// Synced subset of a hidden item — everything but the thumbnail, which stays
+// device-local.
+export type HiddenItemIndex = Omit<HiddenItem, 'thumbnail'>;
+
+export type HiddenItemsIndexMap = Record<string, HiddenItemIndex>;
+
+export interface PendingHiddenItemsIndex {
+    revision: string;
+    index: HiddenItemsIndexMap;
+}
+
+export interface HiddenItemsIndexManifest {
+    revision: string;
+    shardCount: number;
+}
+
+export type HiddenItemsIndexShardKey = `hiddenItemsIndex:${number}`;
+
 // Build a default message map from MSG keys
 export type InferMessageMap<T extends Record<string, string>> = {
     [K in keyof T]: { req?: unknown; res?: unknown };
@@ -42,11 +60,15 @@ export interface ErrorResponse {
 // Typed storage schema used by createTypedStorage
 export interface StorageSchema {
     local: {
-        hiddenItems: HiddenItemsMap;
+        thumbnails: Record<string, string>;
+        pendingHiddenItemsIndex: PendingHiddenItemsIndex;
+        syncedHiddenItemsRevision: string;
     };
     sync: {
         settings: unknown;
         version: string;
+        hiddenItemsIndexManifest: HiddenItemsIndexManifest;
+        [key: HiddenItemsIndexShardKey]: HiddenItemsIndexMap;
     };
     managed: {
         orgEnabled: boolean;

@@ -8,7 +8,7 @@
     "patch_coverage_min": 90
   },
   "ratchet": {
-    "baseline_coverage": 77.41,
+    "baseline_coverage": 82.7,
     "baseline_complexity_inventory": [
       {
         "file": "src/shared/lib/migration.ts",

@@ -36,6 +36,11 @@ export const setupAlarms = async () => {
     }
 };
 
+const resetKnownAlarms = async (): Promise<void> => {
+    await Promise.all([chrome.alarms.clear(ALARMS.POLL), chrome.alarms.clear(ALARMS.DAILY_CLEANUP)]);
+    await setupAlarms();
+};
+
 /** Handle alarm events */
 chrome.alarms.onAlarm.addListener(async (a) => {
     switch (a.name) {
@@ -63,6 +68,10 @@ chrome.alarms.onAlarm.addListener(async (a) => {
             break;
         }
 
+        case ALARMS.HIDDEN_ITEMS_SYNC:
+            // Owned by hidden-items-sync.ts — leave that listener alone.
+            break;
+
         default:
             logger.warn(`[alarms] Unknown alarm triggered: ${a.name}`);
     }
@@ -75,9 +84,7 @@ chrome.runtime.onStartup.addListener(() => {
 
 chrome.runtime.onInstalled.addListener(({ reason }) => {
     if (reason === 'install' || reason === 'update') {
-        // Clean setup or upgrade
-        chrome.alarms.clearAll();
         logger.info(`[alarms] Extension ${reason}, setting up alarms`);
-        setupAlarms().catch((e) => logger.error('[alarms] setup failed', e));
+        void resetKnownAlarms().catch((error) => logger.error('[alarms] setup failed', error));
     }
 });
