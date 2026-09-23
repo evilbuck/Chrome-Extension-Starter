@@ -842,6 +842,7 @@ describe('client resource apply', () => {
         expect(api.tabs.create).toHaveBeenCalledTimes(1);
         const second = client.apply(request('client', item('syn-b')));
         await Promise.resolve();
+        await Promise.resolve();
         expect(api.tabs.create).toHaveBeenCalledTimes(1);
 
         const ready = { id: 90, url: 'https://example.com/', incognito: false, status: 'complete' };
