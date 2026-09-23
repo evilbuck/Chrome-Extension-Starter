@@ -185,7 +185,9 @@ export enum MSG {
     RESOURCE_LIST_ITEMS = 'RESOURCE_LIST_ITEMS',
     RESOURCE_SUBSCRIBE = 'RESOURCE_SUBSCRIBE',
     RESOURCE_UNSUBSCRIBE = 'RESOURCE_UNSUBSCRIBE',
-    RESOURCE_STATUS = 'RESOURCE_STATUS'
+    RESOURCE_STATUS = 'RESOURCE_STATUS',
+    RESOURCE_CLIENT_PENDING = 'RESOURCE_CLIENT_PENDING',
+    RESOURCE_CLIENT_RETRY = 'RESOURCE_CLIENT_RETRY'
 }
 
 export const MESSAGE_SPEC = {
@@ -346,6 +348,14 @@ export const MESSAGE_SPEC = {
     [MSG.RESOURCE_STATUS]: {
         req: {} as Record<string, never>,
         res: {} as { ok: true; items: unknown[] } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_CLIENT_PENDING]: {
+        req: {} as Record<string, never>,
+        res: {} as { ok: true; origins: string[] } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_CLIENT_RETRY]: {
+        req: {} as { origin: string },
+        res: {} as { ok: true } | { ok: false; error: string }
     }
 } as const;
 

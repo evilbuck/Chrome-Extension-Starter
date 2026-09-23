@@ -595,6 +595,17 @@ describe('worker command routing', () => {
         ).toEqual({ ok: false, error: ERROR_KIND.INVALID_SENDER_CONTEXT });
     });
 
+    it('rejects client origin grant commands from a host session', async () => {
+        offscreenReply = (message) => {
+            if (message.type === MSG.OFFSCREEN_STATUS) return connectedStatus(true, 'host');
+            return { ok: false, error: 'disconnected' };
+        };
+        expect(await deliver(background, { type: MSG.RESOURCE_CLIENT_PENDING }, optionsSender)).toEqual({
+            ok: false,
+            error: 'failed'
+        });
+    });
+
     it('routes resource subscriptions through the authorized app channel and persists identity only', async () => {
         (chrome.permissions.contains as Mock).mockResolvedValue(true);
         (chrome.cookies.getAll as Mock).mockResolvedValue([

@@ -426,6 +426,7 @@ const handleGetStatus = async (): Promise<OffscreenStatusResponse> => {
 };
 
 const handleDisconnect = async (): Promise<{ ok: true }> => {
+    resourceClient.clearDenied();
     invalidateRequest('disconnected');
     if (await queryOffscreenPresent()) {
         await sendToExistingOffscreen(MSG.OFFSCREEN_PAIRING, { action: 'cancel' });
@@ -483,6 +484,7 @@ const handlePairing = async (payload: unknown): Promise<PairingCommandResult> =>
     const res = await sendToExistingOffscreen<unknown>(MSG.OFFSCREEN_PAIRING, command);
     const result = asPairingResult(res);
     if (command.action === 'forget') {
+        resourceClient.clearDenied();
         invalidateRequest('disconnected');
         lastKnownConnectionId = null;
         await closeOffscreenDocument();
@@ -565,8 +567,11 @@ void resourceSync.start().catch(() => {
     // A later resource command retries initialization after transient storage/API failure.
 });
 const resourceClient = createResourceClient();
-const runResourceCommand = async <T>(operation: () => Promise<T>): Promise<T | { ok: false; error: ResourceError }> => {
-    const connected = await requireConnected(ROLE.HOST);
+const runResourceCommand = async <T>(
+    operation: () => Promise<T>,
+    role: typeof ROLE.HOST | typeof ROLE.CLIENT = ROLE.HOST
+): Promise<T | { ok: false; error: ResourceError }> => {
+    const connected = await requireConnected(role);
     if (!connected.ok) {
         return {
             ok: false,
@@ -582,7 +587,22 @@ const RESOURCE_UI_COMMANDS: Record<string, true> = {
     [MSG.RESOURCE_LIST_ITEMS]: true,
     [MSG.RESOURCE_SUBSCRIBE]: true,
     [MSG.RESOURCE_UNSUBSCRIBE]: true,
-    [MSG.RESOURCE_STATUS]: true
+    [MSG.RESOURCE_STATUS]: true,
+    [MSG.RESOURCE_CLIENT_PENDING]: true,
+    [MSG.RESOURCE_CLIENT_RETRY]: true
+};
+const clientGrantCommand = async (type: string, payload: Record<string, unknown>): Promise<unknown> => {
+    const connected = await requireConnected(ROLE.CLIENT);
+    if (!connected.ok) {
+        return {
+            ok: false,
+            error: connected.error === 'disconnected' ? RESOURCE_ERROR.DISCONNECTED : RESOURCE_ERROR.FAILED
+        };
+    }
+    if (type === MSG.RESOURCE_CLIENT_PENDING) {
+        return { ok: true, origins: resourceClient.pendingOrigins(connected.connectionId) };
+    }
+    return resourceClient.retryDenied(connected.connectionId, payload.origin);
 };
 
 const handleResourceUiCommand = async (
@@ -604,6 +624,9 @@ const handleResourceUiCommand = async (
             return runResourceCommand(() => resourceSync.unsubscribe(payload.origin, payload.item));
         case MSG.RESOURCE_STATUS:
             return runResourceCommand(resourceSync.status);
+        case MSG.RESOURCE_CLIENT_PENDING:
+        case MSG.RESOURCE_CLIENT_RETRY:
+            return clientGrantCommand(type, payload);
         default:
             return { ok: false, error: ERROR_KIND.UNKNOWN_REQUEST };
     }
@@ -822,7 +845,8 @@ const handleResourceInbound = async (payload: Record<string, unknown>) => {
             authorized: true,
             replyTo,
             origin: payload.origin,
-            item: payload.item
+            item: payload.item,
+            connectionId: status.connectionId
         });
     } catch {
         return {
@@ -906,6 +930,7 @@ const handleOffscreenEvent = (payload: OffscreenEventPayload): void => {
         payload.state === LIFECYCLE.FAILED ||
         payload.authorized !== true
     ) {
+        resourceClient.clearDenied();
         invalidateRequest('disconnected');
     }
     if (payload.state === LIFECYCLE.CONNECTED && payload.authorized === true && payload.role === ROLE.HOST) {

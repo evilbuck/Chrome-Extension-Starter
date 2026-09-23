@@ -837,7 +837,13 @@ export type ResourceApplyResult =
           error: ResourceError;
       };
 
-const applyCookie = async (replyTo: string, origin: string, item: ResourceCookieItem): Promise<ResourceApplyResult> => {
+const applyCookie = async (
+    replyTo: string,
+    origin: string,
+    item: ResourceCookieItem,
+    aborted: () => boolean = () => false
+): Promise<ResourceApplyResult> => {
+    if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
     try {
         const installed = await chrome.cookies.set(cookieDetails(origin, item));
         if (!installed) return errorReply(replyTo, RESOURCE_ERROR.PERMISSION_DENIED);
@@ -847,23 +853,15 @@ const applyCookie = async (replyTo: string, origin: string, item: ResourceCookie
     return appliedReply(replyTo, origin, 'cookie', item.name);
 };
 
-const applyStorage = async (
+const writeHeldStorage = async (
     replyTo: string,
     origin: string,
     item: ResourceLocalStorageItem,
-    opened: Map<string, number>,
+    tabId: number,
     held: Map<string, Set<string>>,
-    timeoutMs: number
+    aborted: () => boolean
 ): Promise<ResourceApplyResult> => {
-    let tabId: number | null;
-    try {
-        tabId = await openDocument(opened, origin);
-    } catch {
-        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
-    }
-    if (tabId === null || !(await waitForDocument(tabId, origin, timeoutMs))) {
-        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
-    }
+    if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
     try {
         const result = await chrome.scripting.executeScript({
             target: { tabId },
@@ -880,17 +878,45 @@ const applyStorage = async (
     return appliedReply(replyTo, origin, 'localStorage', item.key);
 };
 
+const applyStorage = async (
+    replyTo: string,
+    origin: string,
+    item: ResourceLocalStorageItem,
+    opened: Map<string, number>,
+    held: Map<string, Set<string>>,
+    timeoutMs: number,
+    aborted: () => boolean = () => false
+): Promise<ResourceApplyResult> => {
+    if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
+    let tabId: number | null;
+    try {
+        tabId = await openDocument(opened, origin);
+    } catch {
+        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
+    }
+    if (tabId === null || !(await waitForDocument(tabId, origin, timeoutMs))) {
+        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
+    }
+    return writeHeldStorage(replyTo, origin, item, tabId, held, aborted);
+};
+
 export type ResourceApplyRequest = {
     role: Role;
     authorized: boolean;
     replyTo: string;
     origin: unknown;
     item: unknown;
+    connectionId?: string;
 };
 
 export const createResourceClient = (loadTimeoutMs = DOCUMENT_LOAD_MS) => {
     const opened = new Map<string, number>();
     const held = new Map<string, Set<string>>();
+    const denied = new Map<
+        string,
+        { connectionId: string; items: Map<string, ResourceCookieItem | ResourceLocalStorageItem> }
+    >();
+    let deniedEpoch = 0;
     const forgetOpened = (tabId: number): void => {
         for (const [origin, id] of opened) {
             if (id === tabId) opened.delete(origin);
@@ -898,21 +924,142 @@ export const createResourceClient = (loadTimeoutMs = DOCUMENT_LOAD_MS) => {
     };
     chrome.tabs?.onRemoved?.addListener(forgetOpened);
 
-    const apply = async (request: ResourceApplyRequest) => {
-        const replyTo = typeof request.replyTo === 'string' ? request.replyTo : '';
-        if (request.role !== ROLE.CLIENT || request.authorized !== true) {
-            return errorReply(
-                replyTo,
-                request.authorized === true ? RESOURCE_ERROR.FAILED : RESOURCE_ERROR.DISCONNECTED
-            );
+    const deniedKey = (item: ResourceCookieItem | ResourceLocalStorageItem): string =>
+        item.type === 'cookie'
+            ? `cookie\0${cookieIdentityKey({
+                  name: item.name,
+                  domain: item.domain,
+                  path: item.path,
+                  partitionKey: item.partitionKey,
+                  storeId: ''
+              })}`
+            : `storage\0${item.key}`;
+
+    const rememberDenied = (
+        connectionId: string,
+        origin: string,
+        item: ResourceCookieItem | ResourceLocalStorageItem
+    ): void => {
+        for (const [key, hold] of denied) {
+            if (hold.connectionId !== connectionId) denied.delete(key);
         }
+        const existing = denied.get(origin);
+        const items = existing?.connectionId === connectionId ? existing.items : new Map();
+        items.set(deniedKey(item), item);
+        denied.set(origin, { connectionId, items });
+    };
+
+    const forgetDeniedItem = (
+        connectionId: string,
+        origin: string,
+        item: ResourceCookieItem | ResourceLocalStorageItem
+    ): void => {
+        const hold = denied.get(origin);
+        if (!hold || hold.connectionId !== connectionId) return;
+        hold.items.delete(deniedKey(item));
+        if (hold.items.size === 0) denied.delete(origin);
+    };
+
+    const rejectApplyRole = (request: ResourceApplyRequest, replyTo: string): ResourceApplyResult | null => {
+        if (request.role === ROLE.CLIENT && request.authorized === true) return null;
+        return errorReply(replyTo, request.authorized === true ? RESOURCE_ERROR.FAILED : RESOURCE_ERROR.DISCONNECTED);
+    };
+
+    const writeApplied = (
+        replyTo: string,
+        origin: string,
+        item: ResourceCookieItem | ResourceLocalStorageItem,
+        aborted: () => boolean
+    ): Promise<ResourceApplyResult> =>
+        item.type === 'cookie'
+            ? applyCookie(replyTo, origin, item, aborted)
+            : applyStorage(replyTo, origin, item, opened, held, loadTimeoutMs, aborted);
+
+    const applyPermitted = async (
+        replyTo: string,
+        origin: string,
+        item: ResourceCookieItem | ResourceLocalStorageItem,
+        connectionId: string | undefined,
+        aborted: () => boolean
+    ): Promise<ResourceApplyResult> => {
+        if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
+        if (!(await hasPermission(origin))) {
+            if (typeof connectionId === 'string') rememberDenied(connectionId, origin, item);
+            return errorReply(replyTo, RESOURCE_ERROR.PERMISSION_DENIED);
+        }
+        if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
+        const result = await writeApplied(replyTo, origin, item, aborted);
+        if (result.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED && typeof connectionId === 'string') {
+            forgetDeniedItem(connectionId, origin, item);
+        }
+        return result;
+    };
+
+    const apply = async (request: ResourceApplyRequest, aborted: () => boolean = () => false) => {
+        const replyTo = typeof request.replyTo === 'string' ? request.replyTo : '';
+        if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
+        const rejected = rejectApplyRole(request, replyTo);
+        if (rejected) return rejected;
         const origin = canonicalOrigin(request.origin);
         if (!origin) return errorReply(replyTo, RESOURCE_ERROR.MALFORMED);
         const item = parseApplyItem(request.item);
         if (typeof item === 'string') return errorReply(replyTo, item);
-        if (!(await hasPermission(origin))) return errorReply(replyTo, RESOURCE_ERROR.PERMISSION_DENIED);
-        if (item.type === 'cookie') return applyCookie(replyTo, origin, item);
-        return applyStorage(replyTo, origin, item, opened, held, loadTimeoutMs);
+        return applyPermitted(replyTo, origin, item, request.connectionId, aborted);
+    };
+
+    const pendingOrigins = (connectionId: string): string[] =>
+        [...denied.entries()]
+            .filter(([, hold]) => hold.connectionId === connectionId && hold.items.size > 0)
+            .map(([origin]) => origin);
+
+    const replayHeld = async (
+        connectionId: string,
+        origin: string,
+        items: Array<ResourceCookieItem | ResourceLocalStorageItem>,
+        aborted: () => boolean
+    ): Promise<ResourceError | null> => {
+        let failure: ResourceError | null = null;
+        for (const item of items) {
+            if (aborted() || denied.get(origin)?.connectionId !== connectionId) return RESOURCE_ERROR.DISCONNECTED;
+            const result = await apply(
+                {
+                    role: ROLE.CLIENT,
+                    authorized: true,
+                    replyTo: 'client-grant',
+                    origin,
+                    item,
+                    connectionId
+                },
+                aborted
+            );
+            if (aborted()) return RESOURCE_ERROR.DISCONNECTED;
+            if (result.kind !== PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR) continue;
+            failure = result.error;
+            if (result.error === RESOURCE_ERROR.PERMISSION_DENIED) break;
+        }
+        return failure;
+    };
+
+    const retryDenied = async (
+        connectionId: string,
+        originValue: unknown
+    ): Promise<{ ok: true } | { ok: false; error: ResourceError }> => {
+        const origin = canonicalOrigin(originValue);
+        if (!origin) return { ok: false, error: RESOURCE_ERROR.MALFORMED };
+        const hold = denied.get(origin);
+        if (!hold || hold.connectionId !== connectionId) {
+            if (hold) denied.delete(origin);
+            return { ok: false, error: RESOURCE_ERROR.DISCONNECTED };
+        }
+        const epoch = deniedEpoch;
+        const failure = await replayHeld(connectionId, origin, [...hold.items.values()], () => deniedEpoch !== epoch);
+        if (failure) return { ok: false, error: failure };
+        return { ok: true };
+    };
+
+    const clearDenied = (): void => {
+        deniedEpoch += 1;
+        denied.clear();
     };
 
     const releaseLocalStorage = async (origin: string, key: string): Promise<void> => {
@@ -929,5 +1076,5 @@ export const createResourceClient = (loadTimeoutMs = DOCUMENT_LOAD_MS) => {
         }
     };
 
-    return { apply, releaseLocalStorage };
+    return { apply, releaseLocalStorage, pendingOrigins, retryDenied, clearDenied };
 };

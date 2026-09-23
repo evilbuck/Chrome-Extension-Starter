@@ -196,5 +196,8 @@
   "resourcePaused": { "message": "Paused until a same-site tab is open." },
   "resourceSyncFailed": { "message": "The latest value could not be sent. It will retry while checked." },
   "resourcePermissionDenied": { "message": "Site access was not granted." },
+  "resourceClientGrantTitle": { "message": "在此用戶端允許網站" },
+  "resourceClientGrantHelp": { "message": "配對的主機嘗試複製一個網站。在你允許之前不會寫入任何內容。" },
+  "resourceClientGrantAction": { "message": "允許" },
   "resourceLoadFailed": { "message": "Site resources could not be loaded." }
 }
