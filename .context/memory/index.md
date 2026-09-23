@@ -1,3 +1,7 @@
+- 2026-09-22 — [Host site resource sync plan phased into five sessions](host-site-resource-sync-phasing-2026-09-22.md) — `completed`
+
+  - 2026-09-22 | `host-site-resource-sync-phasing-2026-09-22.md` | domains: [phasing, planning, chrome-extension] | topics: [resource-sync, host-options, phases, backlog, wire-contract] | status: completed
+
 - 2026-09-06 — [LAN login handoff checkpoint: +3166 net test lines across 14 files, 5 new test files, 7 new subject artifacts covering Outlook transport research + Slack integration plan, and refreshed guardrails contract.](lan-login-handoff-2026-09-06.md) — `completed`
 
   - 2026-09-06 | `lan-login-handoff-2026-09-06.md` | domains: [chrome-extension, session-handoff, testing, guardrails] | topics: [lan-login-handoff, session-shift, outlook-transport, slack-integration, test-coverage, patch-coverage-baseline] | status: completed
@@ -8,6 +12,7 @@ status: active
 
 # Session memory index
 
+- [2026-09-22 — Host site resource sync plan phased](host-site-resource-sync-phasing-2026-09-22.md): five phases (wire contract hard → site panel medium → live watches medium → client apply hard → e2e/docs easy); Phase 4 hard-depends only on Phase 1, sequenced after 3 for `connection.ts` contention; only Resources Phase 1 active in backlog. [Overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
 - [2026-09-06 — Guardrails baseline raised and tests excluded from complexity](guardrails-baseline-fix-2026-09-06.md): coverage floor 64.48 → 91.07; lizard ignores `__tests__`/`*.test.*`/`*/test/*`; complexity inventory 64 → 62 (test entries dropped, production unchanged). Recheck pass.
 - [2026-09-06 — OpenAI policy audit and enterprise authorization boundary](policy-use-case-audit-2026-09-06.md): cross-device access for a user’s own accounts is not categorically prohibited; real enterprise session replay is paused pending documented service-owner authorization. Pairing is device trust only; no-pairing is synthetic/disposable-only; no monitoring evasion. [Audit](../2026-09-06.policy-use-case-audit/research-policy-use-case-audit.md).
 

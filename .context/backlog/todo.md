@@ -4,6 +4,21 @@ status: active
 
 # Active backlog
 
+
+- [ ] [Host options site resource sync](items/host-site-resource-sync.md)
+
+New options-page feature, independent of the LAN login phase queue. Plan phased 2026-09-22; execution queue below.
+
+- [ ] [Resources Phase 1: Wire contract and permission foundation](items/phase-1-resource-wire-contract.md)
+
+## Upcoming resource sync phases
+
+Sequential after Resources Phase 1; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
+
+- [ ] [Resources Phase 2: Host site picker and resource panel](items/phase-2-resource-site-panel.md)
+- [ ] [Resources Phase 3: Subscriptions and live watches](items/phase-3-resource-live-watches.md)
+- [ ] [Resources Phase 4: Client apply and inbound lifecycle](items/phase-4-resource-client-apply.md)
+- [ ] [Resources Phase 5: End-to-end verification and docs](items/phase-5-resource-e2e-docs.md)
 - [ ] [Phase 1: Record experiment boundary](items/phase-1-experiment-boundary.md)
 
 ## Authorization prerequisite
