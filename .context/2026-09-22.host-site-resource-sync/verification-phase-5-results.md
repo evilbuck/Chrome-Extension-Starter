@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 date: 2026-09-23
 subject: 2026-09-22.host-site-resource-sync
 phase: 5
@@ -9,14 +9,14 @@ phase: 5
 
 ## Deterministic suite
 
-- `pnpm test`: pass — 22 test files, 465 tests.
-- Durable `guardrails.json` contract: pass.
+- `pnpm exec vitest run`: pass — 23 files, 471 tests.
+- Three consecutive fresh runs of `node /home/buckleyrobinson/projects/development_tools/buck-workflow-pi/skills/b-guardrails-check/scripts/check.mjs --cwd` this repo returned durable status pass.
   - Unit: pass.
   - Functional: skipped (no configured command).
-  - Lint: pass, diff-scoped, 50 files.
-  - Coverage: 91.4%, above the 91.07% ratchet baseline.
-  - Patch gate: pass (`null` measurement).
-  - Complexity: pass; 64 remaining hotspots, no new violations.
+  - Lint: pass, diff-scoped.
+  - Coverage: 91.6%, above the 91.07% ratchet baseline.
+  - Patch gate: pass.
+  - Complexity: pass; no new violations.
 
 ## Hygiene inspection
 
@@ -42,10 +42,10 @@ Status: completed in two disposable Chromium profiles against the built extensio
 
 ## Follow-up found by the smoke
 
-The first granted reconnect opened two inactive `https://example.com` tabs (255641197 and 255641198) while replaying one localStorage subscription. Later updates reused one tab. Concurrent applies now share one in-flight `tabs.create`. Regression: `shares one in-flight tab open when two same-origin applies race`. Unit suite 471 passed. Guardrails status pass.
+The first granted reconnect opened two inactive `https://example.com` tabs (255641197 and 255641198) while replaying one localStorage subscription. `openDocument` now keeps one per-origin promise through document readiness for a tracked, existing, or newly created tab, and records `opened` only for a tab this feature creates. A loading non-origin URL is not rejected. The race regression waits for the fourth `aborted` call, immediately before `openDocument`, asserts one `tabs.create`, then emits completion. Its `executeScript` mock returns `{ result: true }` so the assertion does not depend on ambient jsdom `localStorage`.
 
 ## Documentation
 
 - Added `docs/howto/sync-site-resources.md` with pairing, host selection, grant, item selection, client confirmation, live-update, pause/resume, value-visibility, uncheck, size-limit, and enterprise-authorization guidance.
-- Updated `docs/quickstart.md` with the resource panel and current client-grant limitation.
+- Updated `docs/quickstart.md` so the client Grant click is the permission step, not a missing-grant limitation.
 - The how-to tells the client to click Grant and accept Chrome's prompt. It does not present the feature as a bypass of the owner-authorization gate.

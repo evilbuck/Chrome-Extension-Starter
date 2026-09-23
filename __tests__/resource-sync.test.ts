@@ -833,6 +833,7 @@ describe('client resource apply', () => {
         const loading = { id: 90, url: 'about:blank', incognito: false, status: 'loading' };
         api.tabs.create.mockResolvedValue(loading);
         api.tabs.get.mockResolvedValue(loading);
+        api.scripting.executeScript.mockResolvedValue([{ result: true }]);
         vi.stubGlobal('chrome', api);
         const client = createResourceClient();
         const item = (key: string) => ({ type: 'localStorage', key, value: 'synthetic-storage-value' });

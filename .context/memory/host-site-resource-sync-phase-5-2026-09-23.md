@@ -14,10 +14,10 @@ artifacts:
 
 # Host site resource sync — Phase 5 closed
 
-The two-profile smoke is recorded in `verification-phase-5-results.md`. Concurrent same-origin applies share one in-flight tab open. The subject is `close-verified` completed.
+The two-profile smoke is recorded in `verification-phase-5-results.md`. Concurrent same-origin applies share one promise through document readiness, not only through `tabs.create`. The subject is `close-verified` completed.
 
 ## Verification
 
-- Unit suite: 471 tests passed.
-- Durable guardrails: pass.
+- Unit suite: 23 files, 471 tests passed.
+- Three consecutive fresh durable guardrails runs: status pass. Unit, lint, patch, ratchet, and complexity passed. Functional skipped. Coverage 91.6%.
 - Smoke used synthetic values only. The native optional-permission prompt cannot be accepted in headless Chromium; the disposable client profile was reseeded after the Grant click. Production checks were not bypassed.
