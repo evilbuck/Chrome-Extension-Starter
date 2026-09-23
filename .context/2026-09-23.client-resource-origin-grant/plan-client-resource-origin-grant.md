@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 date: 2026-09-23
 subject: 2026-09-23.client-resource-origin-grant
 topics: [chrome-extension, permissions, client-apply, user-gesture]

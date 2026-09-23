@@ -4,7 +4,7 @@ domains: [chrome-extension, permissions, client-apply]
 topics: [origin-grant, user-gesture, resource-apply]
 related: []
 priority: high
-status: active
+status: completed
 subject: 2026-09-23.client-resource-origin-grant
 artifacts:
   - plan-client-resource-origin-grant.md
@@ -21,6 +21,7 @@ A fresh client cannot grant site access from an inbound frame. The authorized cl
 - `pnpm exec vitest run`: 23 files, 469 tests passed.
 - Biome clean on the changed source and tests after format.
 
-## Not done
+## Verification
 
-Phase 5 two-profile smoke is not run. It needs two Chrome profiles and a user gesture on the client.
+- `pnpm exec vitest run`: 23 files, 470 tests passed.
+- Durable guardrails v2 passed after the complexity split: unit, lint, patch, global ratchet, and complexity. Functional gate skipped by contract. Coverage 91.5%.

@@ -716,14 +716,19 @@ const parseApplyItem = (value: unknown): ResourceCookieItem | ResourceLocalStora
     return RESOURCE_ERROR.MALFORMED;
 };
 
-const errorReply = (replyTo: string, error: ResourceError) => ({
-    kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR as const,
+const errorReply = (replyTo: string, error: ResourceError): ResourceApplyResult => ({
+    kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
     replyTo,
     error
 });
 
-const appliedReply = (replyTo: string, origin: string, type: 'cookie' | 'localStorage', id: string) => ({
-    kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED as const,
+const appliedReply = (
+    replyTo: string,
+    origin: string,
+    type: 'cookie' | 'localStorage',
+    id: string
+): ResourceApplyResult => ({
+    kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED,
     replyTo,
     origin,
     type,

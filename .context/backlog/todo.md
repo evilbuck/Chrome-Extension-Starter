@@ -11,9 +11,9 @@ New options-page feature, independent of the LAN login phase queue. Plan phased 
 
 ## Upcoming resource sync phases
 
-Phase 5 is next; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md). Phase 4 client apply is saved. A fresh client still has no origin grant, so Phase 5 smoke is not viable until that follow-up lands.
+The client origin grant is committed. Phase 5 two-profile smoke is next; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
 
-- [ ] [Client origin grant before resource apply](items/client-resource-origin-grant.md)
+
 - [ ] [Resource tab-close signal for auto-opened client tabs](items/resource-tab-close-wire-frame.md)
 - [ ] [Resources Phase 5: End-to-end verification and docs](items/phase-5-resource-e2e-docs.md)
 - [ ] [Phase 1: Record experiment boundary](items/phase-1-experiment-boundary.md)

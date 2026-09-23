@@ -813,12 +813,17 @@ const handleRequestStart = async (
     return { ok: true, requestId };
 };
 
+const inboundConnectionId = (status: OffscreenStatusResponse, payload: Record<string, unknown>): string | null => {
+    if (status.state !== LIFECYCLE.CONNECTED || status.authorized !== true) return null;
+    if (typeof status.connectionId !== 'string' || payload.connectionId !== status.connectionId) return null;
+    return status.connectionId;
+};
+
 const handleResourceInbound = async (payload: Record<string, unknown>) => {
     const replyTo = typeof payload.requestId === 'string' ? payload.requestId : '';
     const status = await handleGetStatus();
-    const connected =
-        status.state === LIFECYCLE.CONNECTED && status.authorized === true && typeof status.connectionId === 'string';
-    if (!connected || payload.connectionId !== status.connectionId) {
+    const connectionId = inboundConnectionId(status, payload);
+    if (connectionId === null) {
         return {
             kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
             replyTo,
@@ -846,7 +851,7 @@ const handleResourceInbound = async (payload: Record<string, unknown>) => {
             replyTo,
             origin: payload.origin,
             item: payload.item,
-            connectionId: status.connectionId
+            connectionId
         });
     } catch {
         return {

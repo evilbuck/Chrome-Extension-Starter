@@ -829,7 +829,7 @@ describe('client resource apply', () => {
 
     it('reuses a user tab and never closes it when the last localStorage key is released', async () => {
         const api = clientChrome();
-        api.__tabs[0] = { ...api.__tabs[0], status: 'complete' };
+        api.__tabs[0] = { ...api.__tabs[0], status: 'complete' } as (typeof api.__tabs)[number];
         vi.stubGlobal('chrome', api);
         const client = createResourceClient();
 
