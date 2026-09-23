@@ -796,8 +796,7 @@ const waitForDocument = (tabId: number, origin: string, timeoutMs: number): Prom
     chrome.tabs.onUpdated.addListener(onUpdated);
     void chrome.tabs.get(tabId).then(
         (tab) => {
-            if (!isOriginTab(tab, origin)) finish(false);
-            else if (tab.status === 'complete') finish(true);
+            if (tab.status === 'complete') finish(isOriginTab(tab, origin));
         },
         () => finish(false)
     );
@@ -820,20 +819,22 @@ const readTrackedTab = async (opened: Map<string, number>, origin: string): Prom
 const openDocument = (
     opened: Map<string, number>,
     opening: Map<string, Promise<number | null>>,
-    origin: string
+    origin: string,
+    timeoutMs: number
 ): Promise<number | null> => {
     const inflight = opening.get(origin);
     if (inflight) return inflight;
     let pending: Promise<number | null>;
     pending = (async () => {
         const tracked = await readTrackedTab(opened, origin);
-        if (tracked !== null) return tracked;
-        const existing = sameOriginTab(await chrome.tabs.query({}), origin);
-        if (existing?.id !== undefined) return existing.id;
-        const created = await chrome.tabs.create({ url: `${origin}/`, active: false });
-        if (created.id === undefined) return null;
-        opened.set(origin, created.id);
-        return created.id;
+        const queried = tracked === null ? sameOriginTab(await chrome.tabs.query({}), origin)?.id : tracked;
+        const created = queried === undefined;
+        const tabId = created ? (await chrome.tabs.create({ url: `${origin}/`, active: false })).id : queried;
+        if (tabId === undefined) return null;
+        if (created) opened.set(origin, tabId);
+        const ready = await waitForDocument(tabId, origin, timeoutMs);
+        if (!ready && created) opened.delete(origin);
+        return ready ? tabId : null;
     })().finally(() => {
         if (opening.get(origin) === pending) opening.delete(origin);
     });
@@ -909,13 +910,11 @@ const applyStorage = async (
     if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
     let tabId: number | null;
     try {
-        tabId = await openDocument(opened, opening, origin);
+        tabId = await openDocument(opened, opening, origin, timeoutMs);
     } catch {
         return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
     }
-    if (tabId === null || !(await waitForDocument(tabId, origin, timeoutMs))) {
-        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
-    }
+    if (tabId === null) return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
     return writeHeldStorage(replyTo, origin, item, tabId, held, aborted);
 };
 

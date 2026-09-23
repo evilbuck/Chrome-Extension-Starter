@@ -830,20 +830,23 @@ describe('client resource apply', () => {
     it('shares one in-flight tab open when two same-origin applies race', async () => {
         const api = clientChrome();
         api.tabs.query.mockResolvedValue([]);
-        let releaseCreate: (tab: { id: number; url: string; incognito: boolean; status: string }) => void = () => undefined;
-        const created = new Promise<{ id: number; url: string; incognito: boolean; status: string }>((resolve) => {
-            releaseCreate = resolve;
-        });
-        api.tabs.create.mockReturnValue(created);
-        api.tabs.get.mockResolvedValue({ id: 90, url: 'https://example.com/', incognito: false, status: 'complete' });
+        const loading = { id: 90, url: 'about:blank', incognito: false, status: 'loading' };
+        api.tabs.create.mockResolvedValue(loading);
+        api.tabs.get.mockResolvedValue(loading);
         vi.stubGlobal('chrome', api);
         const client = createResourceClient();
         const item = (key: string) => ({ type: 'localStorage', key, value: 'synthetic-storage-value' });
 
         const first = client.apply(request('client', item('syn-a')));
+        await vi.waitFor(() => expect(api.tabs.get).toHaveBeenCalled());
+        expect(api.tabs.create).toHaveBeenCalledTimes(1);
         const second = client.apply(request('client', item('syn-b')));
-        await vi.waitFor(() => expect(api.tabs.create).toHaveBeenCalledTimes(1));
-        releaseCreate({ id: 90, url: 'https://example.com/', incognito: false, status: 'complete' });
+        await Promise.resolve();
+        expect(api.tabs.create).toHaveBeenCalledTimes(1);
+
+        const ready = { id: 90, url: 'https://example.com/', incognito: false, status: 'complete' };
+        api.tabs.get.mockResolvedValue(ready);
+        api.tabs.onUpdated.emit(90, { status: 'complete' }, ready);
 
         await expect(first).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-a' });
         await expect(second).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-b' });
