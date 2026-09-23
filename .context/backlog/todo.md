@@ -15,7 +15,7 @@ The client origin grant is committed. Phase 5 two-profile smoke is next; see the
 
 
 - [ ] [Resource tab-close signal for auto-opened client tabs](items/resource-tab-close-wire-frame.md)
-- [ ] [Resources Phase 5: End-to-end verification and docs](items/phase-5-resource-e2e-docs.md)
+
 - [ ] [Phase 1: Record experiment boundary](items/phase-1-experiment-boundary.md)
 
 ## Authorization prerequisite

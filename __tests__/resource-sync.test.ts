@@ -827,6 +827,30 @@ describe('client resource apply', () => {
         expect(api.tabs.remove).toHaveBeenCalledWith(90);
     });
 
+    it('shares one in-flight tab open when two same-origin applies race', async () => {
+        const api = clientChrome();
+        api.tabs.query.mockResolvedValue([]);
+        let releaseCreate: (tab: { id: number; url: string; incognito: boolean; status: string }) => void = () => undefined;
+        const created = new Promise<{ id: number; url: string; incognito: boolean; status: string }>((resolve) => {
+            releaseCreate = resolve;
+        });
+        api.tabs.create.mockReturnValue(created);
+        api.tabs.get.mockResolvedValue({ id: 90, url: 'https://example.com/', incognito: false, status: 'complete' });
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient();
+        const item = (key: string) => ({ type: 'localStorage', key, value: 'synthetic-storage-value' });
+
+        const first = client.apply(request('client', item('syn-a')));
+        const second = client.apply(request('client', item('syn-b')));
+        await vi.waitFor(() => expect(api.tabs.create).toHaveBeenCalledTimes(1));
+        releaseCreate({ id: 90, url: 'https://example.com/', incognito: false, status: 'complete' });
+
+        await expect(first).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-a' });
+        await expect(second).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-b' });
+        expect(api.tabs.create).toHaveBeenCalledTimes(1);
+        expect(api.scripting.executeScript).toHaveBeenCalledTimes(2);
+    });
+
     it('reuses a user tab and never closes it when the last localStorage key is released', async () => {
         const api = clientChrome();
         api.__tabs[0] = { ...api.__tabs[0], status: 'complete' } as (typeof api.__tabs)[number];

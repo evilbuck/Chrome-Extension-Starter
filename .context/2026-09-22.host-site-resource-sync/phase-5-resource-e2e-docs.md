@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 phase: 5
 order: 5
 plan: plan-host-site-resource-sync.md
@@ -15,14 +15,14 @@ from_plan_steps: [9, 10]
 depends_on: [1, 2, 3, 4]
 dependency_type: HARD
 acceptance_criteria:
-  - "[ ] Full vitest suite green: resource-sync + envelope cases plus the existing Slack/pairing suites."
-  - "[ ] `/b-guardrails-check` returns `status: pass` against the repo's durable `guardrails.json` contract."
-  - "[ ] Manual two-profile smoke per the plan's Verification steps 1–8 executed, with results recorded in this subject folder."
-  - "[ ] `docs/howto/sync-site-resources.md` documents pair → host options → pick site → grant permission → check items → confirm client cookie/key; records that values are never shown in the panel and that uncheck is not a remote delete."
-  - "[ ] `docs/quickstart.md` mentions the resource panel."
-  - "[ ] Cookie/storage values are absent from logs and test fixtures (synthetic values only) — verified by inspection; enterprise warning copy present, and the how-to does not present the feature as a bypass of the owner-authorization gate."
-completed_at: null
-completed_by: null
+  - "[x] Full vitest suite green: resource-sync + envelope cases plus the existing Slack/pairing suites."
+  - "[x] `/b-guardrails-check` returns `status: pass` against the repo's durable `guardrails.json` contract."
+  - "[x] Manual two-profile smoke per the plan's Verification steps 1–8 executed, with results recorded in this subject folder."
+  - "[x] `docs/howto/sync-site-resources.md` documents pair → host options → pick site → grant permission → check items → confirm client cookie/key; records that values are never shown in the panel and that uncheck is not a remote delete."
+  - "[x] `docs/quickstart.md` mentions the resource panel."
+  - "[x] Cookie/storage values are absent from logs and test fixtures (synthetic values only) — verified by inspection; enterprise warning copy present, and the how-to does not present the feature as a bypass of the owner-authorization gate."
+completed_at: 2026-09-23
+completed_by: b-build
 ---
 
 # Phase 5: End-to-end verification and docs
@@ -59,6 +59,8 @@ From plan steps 9 (rollup) and 10:
 ## Verification
 
 This phase *is* verification: green suite + passing guardrails verdict + recorded smoke results + docs reviewed are the deliverable.
+
+Evidence is in [verification-phase-5-results.md](verification-phase-5-results.md). The two-profile smoke is recorded there, including the headless permission-prompt limitation.
 
 ## Per-Phase Execution Loop
 

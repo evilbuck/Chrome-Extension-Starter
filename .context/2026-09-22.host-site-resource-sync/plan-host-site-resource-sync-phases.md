@@ -28,7 +28,7 @@ memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-
 | 2: Host site picker and resource panel | completed | medium | none | [phase-2-resource-site-panel.md](phase-2-resource-site-panel.md) |
 | 3: Subscriptions and live watches | completed | medium | none | [phase-3-resource-live-watches.md](phase-3-resource-live-watches.md) |
 | 4: Client apply and inbound lifecycle | completed | hard | none | [phase-4-resource-client-apply.md](phase-4-resource-client-apply.md) |
-| 5: End-to-end verification and docs | pending | easy | none | [phase-5-resource-e2e-docs.md](phase-5-resource-e2e-docs.md) |
+| 5: End-to-end verification and docs | completed | easy | none | [phase-5-resource-e2e-docs.md](phase-5-resource-e2e-docs.md) |
 
 ## Dependency Matrix
 
@@ -99,5 +99,5 @@ Use this overview as the durable navigation map for an OMP execution session. Fo
 - [x] Phase 1: Wire contract and permission foundation — build → review → iterate if in-plan issues → docs if doc impact → save → commit
 - [x] Phase 2: Host site picker and resource panel — build → review → iterate if in-plan issues → docs if doc impact → save → commit
 - [x] Phase 3: Subscriptions and live watches — build → review → iterate if in-plan issues → docs if doc impact → save → commit
-- [ ] Phase 4: Client apply and inbound lifecycle — build → review → iterate if in-plan issues → docs if doc impact → save → commit
-- [ ] Phase 5: End-to-end verification and docs — build → review → iterate if in-plan issues → docs if doc impact → save → commit
+- [x] Phase 4: Client apply and inbound lifecycle — build → review → iterate if in-plan issues → docs if doc impact → save → commit
+- [x] Phase 5: End-to-end verification and docs — build → review → iterate if in-plan issues → docs if doc impact → save → commit

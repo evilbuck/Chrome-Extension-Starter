@@ -34,6 +34,12 @@ Follow [Pair two Chrome browsers](howto/pair-two-browsers.md). The host generate
 
 Closing Options or the popup leaves the offscreen connection running. Extension reload closes transport but retains the pinned peer. [Reconnect](howto/reconnect-paired-browsers.md) without a new code; [Disconnect](howto/disconnect-paired-browser.md) keeps trust; [Forget](howto/forget-paired-browser.md) removes it.
 
+## Copy selected site resources
+
+An authorized host shows **Site resources** in Options. Choose an open `http:` or `https:` origin, approve Chrome's origin-specific cookie and scripting access, then check the cookies or `localStorage` keys to copy live. The panel shows identities and metadata, never values; unchecking stops future updates without deleting the client's last copy.
+
+The paired client shows **Grant** when a site arrives before that profile has allowed it. Click Grant and accept Chrome's prompt. The fail-closed check stays in place. See [Sync site resources between paired browsers](howto/sync-site-resources.md).
+
 ## Transfer a Slack session
 
 Use a dedicated receiving profile without an existing Slack session. Do not sign into another Slack session in that profile during a transfer.
@@ -74,4 +80,4 @@ Remove Beam me up from `chrome://extensions`. This closes transport but does **n
 - [Hosted rendezvous decision](adr/0002-hosted-pairing-rendezvous.md)
 - [Physical-network verification limits](adr/0001-extension-only-transport.md)
 
-Checks: `pnpm test`, `pnpm typecheck`, `pnpm exec biome check src __tests__ services/pairing`, `pnpm --filter beam-me-up-pairing test`, and `pnpm --filter beam-me-up-pairing typecheck`. The service typecheck generates its binding types. No durable `guardrails.json` currently exists; `/b-init-guardrails` can establish coverage and complexity baselines.
+Checks: `pnpm test`, `pnpm typecheck`, `pnpm exec biome check src __tests__ services/pairing`, `pnpm --filter beam-me-up-pairing test`, and `pnpm --filter beam-me-up-pairing typecheck`. The durable quality contract is `guardrails.json`; run `/b-guardrails-check` for the blocking verdict.

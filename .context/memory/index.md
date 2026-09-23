@@ -36,7 +36,7 @@ status: active
 
 # Session memory index
 
-- [2026-09-23 — Host site resource sync Phase 5](host-site-resource-sync-phase-5-2026-09-23.md): full 465-test suite and durable guardrails pass; how-to and quickstart document the panel and authorization boundary. Phase remains active because a fresh client has no origin-grant gesture, so the required two-profile smoke cannot pass step 4. [Evidence](../2026-09-22.host-site-resource-sync/phase-5-verification-results.md).
+- [2026-09-23 — Host site resource sync Phase 5](host-site-resource-sync-phase-5-2026-09-23.md): two-profile smoke recorded, including the headless permission-prompt limitation. Concurrent same-origin applies share one in-flight tab open. Subject closed. [Evidence](../2026-09-22.host-site-resource-sync/verification-phase-5-results.md).
 - [2026-09-23 — Host site resource sync Phase 4](host-site-resource-sync-phase-4-2026-09-23.md): client applies authorized inbound upserts; host, unpaired, and unauthorized frames do not write. Cookie fidelity includes host-only omission and partition keys. localStorage reuses or opens one background tab per origin and closes only feature-opened tabs. Review passed with no in-plan defects. Guardrails pass. Next: commit, then a client origin grant before Phase 5 smoke. [Phase](../2026-09-22.host-site-resource-sync/phase-4-resource-client-apply.md).
 - [2026-09-22 — Host site resource sync Phase 3](host-site-resource-sync-phase-3-2026-09-22.md): persistent identity-only subscriptions and pause-aware localStorage watches. Follow-up review passed after chaining refreshes on a tail queue so a tab close during an in-flight read stays paused. Next: Phase 4. [Phase](../2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md).
 

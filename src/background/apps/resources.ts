@@ -817,15 +817,28 @@ const readTrackedTab = async (opened: Map<string, number>, origin: string): Prom
     return null;
 };
 
-const openDocument = async (opened: Map<string, number>, origin: string): Promise<number | null> => {
-    const tracked = await readTrackedTab(opened, origin);
-    if (tracked !== null) return tracked;
-    const existing = sameOriginTab(await chrome.tabs.query({}), origin);
-    if (existing?.id !== undefined) return existing.id;
-    const created = await chrome.tabs.create({ url: `${origin}/`, active: false });
-    if (created.id === undefined) return null;
-    opened.set(origin, created.id);
-    return created.id;
+const openDocument = (
+    opened: Map<string, number>,
+    opening: Map<string, Promise<number | null>>,
+    origin: string
+): Promise<number | null> => {
+    const inflight = opening.get(origin);
+    if (inflight) return inflight;
+    let pending: Promise<number | null>;
+    pending = (async () => {
+        const tracked = await readTrackedTab(opened, origin);
+        if (tracked !== null) return tracked;
+        const existing = sameOriginTab(await chrome.tabs.query({}), origin);
+        if (existing?.id !== undefined) return existing.id;
+        const created = await chrome.tabs.create({ url: `${origin}/`, active: false });
+        if (created.id === undefined) return null;
+        opened.set(origin, created.id);
+        return created.id;
+    })().finally(() => {
+        if (opening.get(origin) === pending) opening.delete(origin);
+    });
+    opening.set(origin, pending);
+    return pending;
 };
 
 export type ResourceApplyResult =
@@ -888,6 +901,7 @@ const applyStorage = async (
     origin: string,
     item: ResourceLocalStorageItem,
     opened: Map<string, number>,
+    opening: Map<string, Promise<number | null>>,
     held: Map<string, Set<string>>,
     timeoutMs: number,
     aborted: () => boolean = () => false
@@ -895,7 +909,7 @@ const applyStorage = async (
     if (aborted()) return errorReply(replyTo, RESOURCE_ERROR.DISCONNECTED);
     let tabId: number | null;
     try {
-        tabId = await openDocument(opened, origin);
+        tabId = await openDocument(opened, opening, origin);
     } catch {
         return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
     }
@@ -916,6 +930,7 @@ export type ResourceApplyRequest = {
 
 export const createResourceClient = (loadTimeoutMs = DOCUMENT_LOAD_MS) => {
     const opened = new Map<string, number>();
+    const opening = new Map<string, Promise<number | null>>();
     const held = new Map<string, Set<string>>();
     const denied = new Map<
         string,
@@ -978,7 +993,7 @@ export const createResourceClient = (loadTimeoutMs = DOCUMENT_LOAD_MS) => {
     ): Promise<ResourceApplyResult> =>
         item.type === 'cookie'
             ? applyCookie(replyTo, origin, item, aborted)
-            : applyStorage(replyTo, origin, item, opened, held, loadTimeoutMs, aborted);
+            : applyStorage(replyTo, origin, item, opened, opening, held, loadTimeoutMs, aborted);
 
     const applyPermitted = async (
         replyTo: string,

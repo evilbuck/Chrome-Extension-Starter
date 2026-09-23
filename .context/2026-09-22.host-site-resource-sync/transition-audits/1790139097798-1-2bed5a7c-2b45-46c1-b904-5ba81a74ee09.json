@@ -1,0 +1,22 @@
+{
+  "legal": [
+    {
+      "kind": "retry"
+    },
+    {
+      "kind": "advance"
+    },
+    {
+      "kind": "block"
+    }
+  ],
+  "raw": "```json\n{\n  \"choice\": \"block\",\n  \"reason\": \"Postcondition scan returned ambiguous result with docsImpact=true; must resolve ambiguity before advancing to docs phase to avoid recording unverified state in phase-5 artifact. Retry would re-run the same check with same outcome; advance would commit ambiguous verification into durable docs. Block to clarify what the postcondition check actually verified before phase transition.\"\n}\n```",
+  "parsed": {
+    "choice": "block",
+    "reason": "Postcondition scan returned ambiguous result with docsImpact=true; must resolve ambiguity before advancing to docs phase to avoid recording unverified state in phase-5 artifact. Retry would re-run the same check with same outcome; advance would commit ambiguous verification into durable docs. Block to clarify what the postcondition check actually verified before phase transition."
+  },
+  "accepted": true,
+  "reason": "Postcondition scan returned ambiguous result with docsImpact=true; must resolve ambiguity before advancing to docs phase to avoid recording unverified state in phase-5 artifact. Retry would re-run the same check with same outcome; advance would commit ambiguous verification into durable docs. Block to clarify what the postcondition check actually verified before phase transition.",
+  "context": "state=building phase=.context/2026-09-22.host-site-resource-sync/phase-5-resource-e2e-docs.md why=postcondition scan ambiguous parseable=true docsImpact=true howtoImpact=false postcondition=ambiguous",
+  "attempt": 1
+}
