@@ -345,6 +345,95 @@ describe('offscreen connected peer commands', () => {
         );
     });
 
+    it('sends resource_upsert from an authorized host through sendRequest', async () => {
+        harness.state.role = 'host';
+        const item = { type: 'localStorage', key: 'syn-key', value: 'syn-value' };
+        harness.state.sendRequest.mockResolvedValueOnce({
+            payload: {
+                kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED,
+                replyTo: requestId,
+                origin: 'https://example.com',
+                type: 'localStorage',
+                id: 'syn-key'
+            }
+        });
+        const response = await new Promise<unknown>((resolve) => {
+            const pending = offscreen(
+                targeted(MSG.OFFSCREEN_APP_REQUEST, {
+                    kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                    origin: 'https://example.com',
+                    item,
+                    deadlineMs: 4000,
+                    connectionId
+                }),
+                workerSender,
+                resolve
+            );
+            if (pending !== true) resolve(undefined);
+        });
+        expect(response).toMatchObject({ ok: true, payload: { kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED } });
+        expect(harness.state.sendRequest).toHaveBeenLastCalledWith(
+            { kind: PAYLOAD_KIND.RESOURCE_UPSERT, origin: 'https://example.com', item },
+            4000
+        );
+    });
+
+    it('does not forward unauthorized resource_upsert inbound or report values', async () => {
+        harness.state.authorized = false;
+        harness.state.deps?.onPeerMessage({
+            v: 1,
+            role: 'host',
+            connectionId,
+            requestId,
+            created: Date.now(),
+            deadline: Date.now() + 5000,
+            payload: {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com',
+                item: { type: 'localStorage', key: 'syn-key', value: 'syn-secret' }
+            }
+        } as PeerEnvelope);
+        expect(harness.state.sendReply).not.toHaveBeenCalled();
+        expect(JSON.stringify(sent)).not.toContain('syn-secret');
+    });
+
+    it('forwards authorized client resource_upsert inbound without logging values', async () => {
+        harness.state.deps?.onPeerMessage({
+            v: 1,
+            role: 'host',
+            connectionId,
+            requestId,
+            created: Date.now(),
+            deadline: Date.now() + 5000,
+            payload: {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com',
+                item: { type: 'localStorage', key: 'syn-key', value: 'syn-secret' }
+            }
+        } as PeerEnvelope);
+        await vi.waitFor(() => expect(harness.state.sendReply).toHaveBeenCalled());
+        expect(sent).toEqual([
+            expect.objectContaining({
+                type: MSG.OFFSCREEN_APP_INBOUND,
+                payload: expect.objectContaining({
+                    kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                    origin: 'https://example.com',
+                    connectionId,
+                    requestId
+                })
+            })
+        ]);
+        expect(harness.state.sendReply).toHaveBeenCalledWith(
+            expect.objectContaining({
+                kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+                replyTo: requestId,
+                error: 'failed'
+            }),
+            expect.any(Number)
+        );
+        expect(sent.some((message) => (message as { type?: string }).type === MSG.OFFSCREEN_EVENT)).toBe(false);
+    });
+
     it('surfaces pairing command failures from the controller', async () => {
         harness.state.handleCommand.mockRejectedValueOnce(new Error('boom'));
         expect(await deliver(targeted(MSG.OFFSCREEN_PAIRING, { action: 'status' }))).toEqual({

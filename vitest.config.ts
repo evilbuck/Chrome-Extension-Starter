@@ -13,7 +13,8 @@ export default defineConfig({
                 test: {
                     root: './__tests__',
                     name: { label: 'core', color: 'green' },
-                    environment: 'jsdom'
+                    environment: 'jsdom',
+                    setupFiles: ['./setup-promise.ts']
                 }
             }
         ],

@@ -1,10 +1,10 @@
 ---
 title: Resources Phase 1: Wire contract and permission foundation
-status: active
+status: completed
 priority: high
 created: 2026-09-22
 updated: 2026-09-22
-completed: null
+completed: 2026-09-22
 related:
   - .context/2026-09-22.host-site-resource-sync/phase-1-resource-wire-contract.md
   - .context/2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md
@@ -14,4 +14,6 @@ related:
 
 Optional host permissions (`*://*/*` in `optional_host_permissions` only), cookie/localStorage identities and origin guards (`src/shared/lib/resources.ts`), `RESOURCE_*` message kinds, `resource_upsert`/`resource_applied`/`resource_error` envelope kinds with strict parse and 48 KiB item / 96 KiB envelope caps, peer allow-through, and authorized offscreen forwarding. Envelope tests for malformed/oversize/unknown-kind; Slack suites must stay green.
 
-Full details and acceptance criteria: [phase-1-resource-wire-contract.md](../../2026-09-22.host-site-resource-sync/phase-1-resource-wire-contract.md). Execute with `/b-build-hard`.
+Shipped 2026-09-22. Guardrails v2 pass. Review pass with warning (host outbound item not re-parsed). Next: Phase 2 site panel.
+
+Full details: [phase-1-resource-wire-contract.md](../../../2026-09-22.host-site-resource-sync/phase-1-resource-wire-contract.md).

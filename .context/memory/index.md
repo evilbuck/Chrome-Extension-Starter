@@ -1,3 +1,7 @@
+- 2026-09-22 — [Host site resource sync Phase 1: wire contract and optional host permissions](host-site-resource-sync-phase-1-2026-09-22.md) — `completed`
+
+  - 2026-09-22 | `host-site-resource-sync-phase-1-2026-09-22.md` | domains: [chrome-extension, wire-contract, testing] | topics: [resource-sync, envelope, optional-host-permissions, offscreen, resource-upsert] | status: completed
+
 - 2026-09-22 — [Host site resource sync plan phased into five sessions](host-site-resource-sync-phasing-2026-09-22.md) — `completed`
 
   - 2026-09-22 | `host-site-resource-sync-phasing-2026-09-22.md` | domains: [phasing, planning, chrome-extension] | topics: [resource-sync, host-options, phases, backlog, wire-contract] | status: completed
@@ -11,6 +15,8 @@ status: active
 ---
 
 # Session memory index
+
+- [2026-09-22 — Host site resource sync Phase 1](host-site-resource-sync-phase-1-2026-09-22.md): optional `*://*/*` host permissions, identities, `resource_upsert`/`applied`/`error` with 48 KiB/96 KiB caps, authorized offscreen forward. Guardrails pass. Review warning: host send does not re-parse item. Next: Phase 2. [Phase](../2026-09-22.host-site-resource-sync/phase-1-resource-wire-contract.md).
 
 - [2026-09-22 — Host site resource sync plan phased](host-site-resource-sync-phasing-2026-09-22.md): five phases (wire contract hard → site panel medium → live watches medium → client apply hard → e2e/docs easy); Phase 4 hard-depends only on Phase 1, sequenced after 3 for `connection.ts` contention; only Resources Phase 1 active in backlog. [Overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
 - [2026-09-06 — Guardrails baseline raised and tests excluded from complexity](guardrails-baseline-fix-2026-09-06.md): coverage floor 64.48 → 91.07; lizard ignores `__tests__`/`*.test.*`/`*/test/*`; complexity inventory 64 → 62 (test entries dropped, production unchanged). Recheck pass.

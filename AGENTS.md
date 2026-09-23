@@ -137,3 +137,14 @@ If a check fails, re-verify before escalating:
 3. If it fails again, treat it as a real failure and act on the verdict.
 
 <!-- END b-init-guardrails -->
+
+<!-- BEGIN b-docs:conventions -->
+### Conventions
+
+- Resource frames: typed `resource_upsert` / `resource_applied` / `resource_error` on the existing peer envelope; never generic blobs or a parallel send path. Forward only when `pairing.isAuthorized(connectionId)`.
+- Caps: reject a single resource item over 48 KiB; envelope cap is `PEER_MAX_BYTES` (96 KiB). Do not chunk in v1.
+- Parse fail-closed: unknown fields, missing origin, unpaired `connectionId`.
+- Optional site access: add origins only to `optional_host_permissions`; never `host_permissions` for `*://*/*`. Permission object is `{ permissions: ['cookies', 'scripting'], origins: [\`${origin}/*\`] }`.
+- Value-free: logs and tests must not include real cookie/storage values; synthetic fixtures only.
+- Cookie identity is `name + domain + path + partitionKey + storeId`; localStorage identity is `origin + key`. Skip non-http(s), `RESTRICTED` schemes, and incognito tabs.
+<!-- END b-docs:conventions -->

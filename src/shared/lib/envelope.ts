@@ -18,6 +18,9 @@ import {
     PAYLOAD_RESPONSE_KIND,
     PEER_MAX_BYTES,
     PEER_VERSION,
+    RESOURCE_ERRORS,
+    RESOURCE_ITEM_MAX_BYTES,
+    type ResourceError,
     type Role
 } from '@/shared/constants';
 import {
@@ -192,6 +195,36 @@ export interface SlackVerifyPayload {
     source: SlackSource;
 }
 
+export type ResourceCookieSameSite = 'no_restriction' | 'lax' | 'strict' | 'unspecified';
+
+export type ResourceCookieItem = {
+    type: 'cookie';
+    name: string;
+    domain: string;
+    path: string;
+    secure: boolean;
+    httpOnly: boolean;
+    sameSite: ResourceCookieSameSite;
+    session: boolean;
+    expirationDate?: number;
+    partitionKey?: { topLevelSite?: string; hasCrossSiteAncestor?: boolean };
+    value: string;
+};
+
+export type ResourceLocalStorageItem = {
+    type: 'localStorage';
+    key: string;
+    value: string;
+};
+
+export type ResourceItem = ResourceCookieItem | ResourceLocalStorageItem;
+
+export interface ResourceUpsertPayload {
+    kind: typeof PAYLOAD_KIND.RESOURCE_UPSERT;
+    origin: string;
+    item: ResourceItem;
+}
+
 /** A response frame's payload carries the original requestId in `replyTo`.
  *  It is structurally distinct from any request payload. */
 export interface PeerEchoResponsePayload {
@@ -223,20 +256,37 @@ export interface SlackErrorPayload {
     error: SlackFailure;
 }
 
+export interface ResourceAppliedPayload {
+    kind: typeof PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED;
+    replyTo: string;
+    origin: string;
+    type: 'cookie' | 'localStorage';
+    id: string;
+}
+
+export interface ResourceErrorPayload {
+    kind: typeof PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR;
+    replyTo: string;
+    error: ResourceError;
+}
+
 export type PeerPayload =
     | PeerEchoPayload
     | PeerPingPayload
     | PeerCancelPayload
     | SlackListPayload
     | SlackCapturePayload
-    | SlackVerifyPayload;
+    | SlackVerifyPayload
+    | ResourceUpsertPayload;
 
 export type PeerResponsePayload =
     | PeerEchoResponsePayload
     | SlackSourcesPayload
     | SlackSessionPayload
     | SlackVerifiedPayload
-    | SlackErrorPayload;
+    | SlackErrorPayload
+    | ResourceAppliedPayload
+    | ResourceErrorPayload;
 
 export interface PeerRequestEnvelope {
     v: typeof PEER_VERSION;
@@ -275,6 +325,109 @@ const byteLength = (value: unknown): number =>
 const parseSlackSourceField = (obj: Record<string, unknown>): SlackSource => {
     if (!isSlackSource(obj.source)) return fail(ERROR_KIND.MALFORMED, 'slack source is invalid');
     return obj.source;
+};
+
+const COOKIE_SAMESITE = ['no_restriction', 'lax', 'strict', 'unspecified'] as const;
+
+const parsePartitionKey = (value: unknown): ResourceCookieItem['partitionKey'] | undefined => {
+    if (value === undefined) return undefined;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return fail(ERROR_KIND.MALFORMED, 'cookie.partitionKey is invalid');
+    }
+    const obj = value as Record<string, unknown>;
+    if (!onlyKeys(obj, ['topLevelSite', 'hasCrossSiteAncestor'])) {
+        return fail(ERROR_KIND.MALFORMED, 'cookie.partitionKey has unexpected fields');
+    }
+    const out: NonNullable<ResourceCookieItem['partitionKey']> = {};
+    if (obj.topLevelSite !== undefined) {
+        const topLevelSite = obj.topLevelSite;
+        if (typeof topLevelSite !== 'string') return fail(ERROR_KIND.MALFORMED, 'cookie.partitionKey.topLevelSite');
+        out.topLevelSite = topLevelSite;
+    }
+    if (obj.hasCrossSiteAncestor !== undefined) {
+        const hasCrossSiteAncestor = obj.hasCrossSiteAncestor;
+        if (typeof hasCrossSiteAncestor !== 'boolean') {
+            return fail(ERROR_KIND.MALFORMED, 'cookie.partitionKey.hasCrossSiteAncestor');
+        }
+        out.hasCrossSiteAncestor = hasCrossSiteAncestor;
+    }
+    return out;
+};
+
+const parseCookieItem = (obj: Record<string, unknown>): ResourceCookieItem => {
+    const allowedCookie = [
+        'type',
+        'name',
+        'domain',
+        'path',
+        'secure',
+        'httpOnly',
+        'sameSite',
+        'session',
+        'value',
+        'expirationDate',
+        'partitionKey'
+    ];
+    if (!onlyKeys(obj, allowedCookie)) fail(ERROR_KIND.MALFORMED, 'cookie item has unexpected fields');
+    const secure = obj.secure;
+    const httpOnly = obj.httpOnly;
+    const session = obj.session;
+    if (typeof secure !== 'boolean' || typeof httpOnly !== 'boolean' || typeof session !== 'boolean') {
+        return fail(ERROR_KIND.MALFORMED, 'cookie flags must be boolean');
+    }
+    const item: ResourceCookieItem = {
+        type: 'cookie',
+        name: requireString(obj, 'name'),
+        domain: requireString(obj, 'domain'),
+        path: requireString(obj, 'path'),
+        secure,
+        httpOnly,
+        sameSite: requireEnum(obj, 'sameSite', COOKIE_SAMESITE),
+        session,
+        value: requireString(obj, 'value')
+    };
+    if (obj.expirationDate !== undefined) {
+        const expirationDate = obj.expirationDate;
+        if (typeof expirationDate !== 'number' || !Number.isFinite(expirationDate)) {
+            return fail(ERROR_KIND.MALFORMED, 'cookie.expirationDate is invalid');
+        }
+        item.expirationDate = expirationDate;
+    }
+    const partitionKey = parsePartitionKey(obj.partitionKey);
+    if (partitionKey !== undefined) item.partitionKey = partitionKey;
+    return item;
+};
+
+const parseResourceItem = (value: unknown): ResourceItem => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return fail(ERROR_KIND.MALFORMED, 'resource item must be an object');
+    }
+    if (byteLength(value) > RESOURCE_ITEM_MAX_BYTES) {
+        fail(ERROR_KIND.OVERSIZED, `resource item exceeds ${RESOURCE_ITEM_MAX_BYTES} bytes`);
+    }
+    const obj = value as Record<string, unknown>;
+    const type = requireEnum(obj, 'type', ['cookie', 'localStorage'] as const);
+    if (type === 'localStorage') {
+        if (!onlyKeys(obj, ['type', 'key', 'value'])) {
+            fail(ERROR_KIND.MALFORMED, 'localStorage item has unexpected fields');
+        }
+        return { type, key: requireString(obj, 'key'), value: requireString(obj, 'value') };
+    }
+    return parseCookieItem(obj);
+};
+
+const parseResourceUpsert = (obj: Record<string, unknown>): ResourceUpsertPayload => {
+    if (!onlyKeys(obj, ['kind', 'origin', 'item'])) {
+        fail(ERROR_KIND.MALFORMED, 'resource_upsert payload has unexpected fields');
+    }
+    const origin = requireString(obj, 'origin');
+    try {
+        const parsed = new URL(origin);
+        if (parsed.origin !== origin) fail(ERROR_KIND.MALFORMED, 'resource_upsert.origin is not an origin');
+    } catch {
+        fail(ERROR_KIND.MALFORMED, 'resource_upsert.origin is not a URL');
+    }
+    return { kind: PAYLOAD_KIND.RESOURCE_UPSERT, origin, item: parseResourceItem(obj.item) };
 };
 
 const parseRequestPayload = (obj: Record<string, unknown>): PeerPayload => {
@@ -317,7 +470,36 @@ const parseRequestPayload = (obj: Record<string, unknown>): PeerPayload => {
     return fail(ERROR_KIND.MALFORMED, `unknown request payload kind: ${String(kind)}`);
 };
 
+const parseAnyRequestPayload = (obj: Record<string, unknown>): PeerPayload => {
+    if (obj.kind === PAYLOAD_KIND.RESOURCE_UPSERT) return parseResourceUpsert(obj);
+    return parseRequestPayload(obj);
+};
+
 const SLACK_SOURCE_CAP = 32;
+
+const parseResourceResponse = (obj: Record<string, unknown>, replyTo: string): PeerResponsePayload => {
+    if (obj.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED) {
+        if (!onlyKeys(obj, ['kind', 'replyTo', 'origin', 'type', 'id'])) {
+            fail(ERROR_KIND.MALFORMED, 'resource_applied payload has unexpected fields');
+        }
+        const type = requireEnum(obj, 'type', ['cookie', 'localStorage'] as const);
+        return {
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED,
+            replyTo,
+            origin: requireString(obj, 'origin'),
+            type,
+            id: requireString(obj, 'id')
+        };
+    }
+    if (!onlyKeys(obj, ['kind', 'replyTo', 'error'])) {
+        fail(ERROR_KIND.MALFORMED, 'resource_error payload has unexpected fields');
+    }
+    return {
+        kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+        replyTo,
+        error: requireEnum(obj, 'error', RESOURCE_ERRORS)
+    };
+};
 
 const parseResponsePayload = (obj: Record<string, unknown>): PeerResponsePayload => {
     const kind = requireEnum(obj, 'kind', [
@@ -363,8 +545,20 @@ const parseResponsePayload = (obj: Record<string, unknown>): PeerResponsePayload
     return fail(ERROR_KIND.MALFORMED, `unknown response payload kind: ${String(kind)}`);
 };
 
+const parseAnyResponsePayload = (obj: Record<string, unknown>): PeerResponsePayload => {
+    if (obj.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED || obj.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR) {
+        const replyTo = requireString(obj, 'replyTo');
+        if (!isUuidV4(replyTo)) fail(ERROR_KIND.MALFORMED, 'resource replyTo is not a valid UUID v4');
+        return parseResourceResponse(obj, replyTo);
+    }
+    return parseResponsePayload(obj);
+};
+
 export const isSlackRequestKind = (kind: string): kind is (typeof SLACK_REQUEST_KINDS)[number] =>
     (SLACK_REQUEST_KINDS as readonly string[]).includes(kind);
+
+export const isResourceRequestKind = (kind: string): kind is typeof PAYLOAD_KIND.RESOURCE_UPSERT =>
+    kind === PAYLOAD_KIND.RESOURCE_UPSERT;
 
 /** Build a peer request envelope. Pure: does not transmit. */
 export const encodePeerRequest = (
@@ -378,6 +572,9 @@ export const encodePeerRequest = (
     if (!isUuidV4(requestId)) fail(ERROR_KIND.MALFORMED, 'requestId is not a valid UUID v4');
     if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
         fail(ERROR_KIND.MALFORMED, 'deadlineMs must be a positive finite number');
+    }
+    if (payload.kind === PAYLOAD_KIND.RESOURCE_UPSERT && byteLength(payload.item) > RESOURCE_ITEM_MAX_BYTES) {
+        fail(ERROR_KIND.OVERSIZED, `resource item exceeds ${RESOURCE_ITEM_MAX_BYTES} bytes`);
     }
     return {
         v: PEER_VERSION,
@@ -475,7 +672,7 @@ export const parsePeer = (raw: unknown, expected: { role: Role; connectionId: st
     const payloadObj = rawPayload as Record<string, unknown>;
 
     if (replyTo !== undefined) {
-        const response = parseResponsePayload(payloadObj);
+        const response = parseAnyResponsePayload(payloadObj);
         if (response.replyTo !== replyTo) {
             fail(ERROR_KIND.MALFORMED, 'top-level replyTo does not match payload.replyTo');
         }
@@ -490,7 +687,7 @@ export const parsePeer = (raw: unknown, expected: { role: Role; connectionId: st
         };
     }
 
-    const request = parseRequestPayload(payloadObj);
+    const request = parseAnyRequestPayload(payloadObj);
     return {
         v: PEER_VERSION,
         role,

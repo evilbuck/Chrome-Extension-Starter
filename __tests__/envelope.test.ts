@@ -758,5 +758,347 @@ describe('parsePeer envelope shape', () => {
     });
 });
 
+describe('parsePeer resource payloads', () => {
+    const cookieItem = {
+        type: 'cookie' as const,
+        name: 'syn-name',
+        domain: 'example.com',
+        path: '/',
+        secure: true,
+        httpOnly: false,
+        sameSite: 'lax' as const,
+        session: true,
+        value: 'syn-value'
+    };
+
+    it('round-trips a cookie resource_upsert', () => {
+        const id = makeUuid();
+        const env = encodePeerRequest(ROLE.HOST, id, makeUuid(), 5000, {
+            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+            origin: 'https://example.com',
+            item: cookieItem
+        });
+        const parsed = parsePeer(env, { role: ROLE.HOST, connectionId: id });
+        if ('replyTo' in parsed) throw new Error('expected request');
+        expect(parsed.payload).toEqual({
+            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+            origin: 'https://example.com',
+            item: cookieItem
+        });
+    });
+
+    it('round-trips a cookie with expirationDate and partitionKey', () => {
+        const id = makeUuid();
+        const item = {
+            ...cookieItem,
+            session: false,
+            expirationDate: 1_700_000_000,
+            partitionKey: { topLevelSite: 'https://example.com', hasCrossSiteAncestor: false }
+        };
+        const parsed = parsePeer(
+            encodePeerRequest(ROLE.HOST, id, makeUuid(), 5000, {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com',
+                item
+            }),
+            { role: ROLE.HOST, connectionId: id }
+        );
+        if ('replyTo' in parsed) throw new Error('expected request');
+        expect(parsed.payload).toEqual({
+            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+            origin: 'https://example.com',
+            item
+        });
+    });
+
+    it('round-trips a localStorage resource_upsert', () => {
+        const id = makeUuid();
+        const item = { type: 'localStorage' as const, key: 'syn-key', value: 'syn-value' };
+        const parsed = parsePeer(
+            encodePeerRequest(ROLE.HOST, id, makeUuid(), 5000, {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com',
+                item
+            }),
+            { role: ROLE.HOST, connectionId: id }
+        );
+        if ('replyTo' in parsed) throw new Error('expected request');
+        expect(parsed.payload).toEqual({
+            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+            origin: 'https://example.com',
+            item
+        });
+    });
+
+    it('rejects a non-origin URL', () => {
+        const id = makeUuid();
+        const env = {
+            ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+            payload: {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com/path',
+                item: cookieItem
+            }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('round-trips resource_applied and resource_error', () => {
+        const id = makeUuid();
+        const replyTo = makeUuid();
+        const applied = parsePeer(
+            encodePeerResponse(ROLE.CLIENT, id, makeUuid(), 5000, {
+                kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED,
+                replyTo,
+                origin: 'https://example.com',
+                type: 'cookie',
+                id: 'syn-name'
+            }),
+            { role: ROLE.CLIENT, connectionId: id }
+        );
+        if (!('replyTo' in applied)) throw new Error('expected response');
+        expect(applied.payload.kind).toBe(PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED);
+
+        const errored = parsePeer(
+            encodePeerResponse(ROLE.CLIENT, id, makeUuid(), 5000, {
+                kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+                replyTo,
+                error: 'oversized'
+            }),
+            { role: ROLE.CLIENT, connectionId: id }
+        );
+        if (!('replyTo' in errored)) throw new Error('expected response');
+        expect(errored.payload).toEqual({
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+            replyTo,
+            error: 'oversized'
+        });
+    });
+
+    it('rejects extra fields on resource_upsert', () => {
+        const id = makeUuid();
+        const env = {
+            ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+            payload: {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com',
+                item: cookieItem,
+                extra: true
+            }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('rejects missing origin on resource_upsert', () => {
+        const id = makeUuid();
+        const env = {
+            ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+            payload: { kind: PAYLOAD_KIND.RESOURCE_UPSERT, item: cookieItem }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('rejects an unknown payload kind', () => {
+        const id = makeUuid();
+        const env = {
+            ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+            payload: { kind: 'resource_blob', origin: 'https://example.com' }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.MALFORMED);
+    });
+
+    it('rejects unpaired connectionId', () => {
+        const id = makeUuid();
+        const other = makeUuid();
+        const env = encodePeerRequest(ROLE.HOST, id, makeUuid(), 5000, {
+            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+            origin: 'https://example.com',
+            item: cookieItem
+        });
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: other }), ERROR_KIND.CONNECTION_ID_MISMATCH);
+    });
+
+    it('rejects a single item whose JSON exceeds 48 KiB', () => {
+        const id = makeUuid();
+        const item = { type: 'localStorage' as const, key: 'syn-key', value: 'x'.repeat(49 * 1024) };
+        expectKind(
+            () =>
+                encodePeerRequest(ROLE.HOST, id, makeUuid(), 5000, {
+                    kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                    origin: 'https://example.com',
+                    item
+                }),
+            ERROR_KIND.OVERSIZED
+        );
+        const env = {
+            ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+            payload: { kind: PAYLOAD_KIND.RESOURCE_UPSERT, origin: 'https://example.com', item }
+        };
+        expectKind(() => parsePeer(env, { role: ROLE.HOST, connectionId: id }), ERROR_KIND.OVERSIZED);
+    });
+
+    it('rejects extra fields on cookie, localStorage, applied, and error payloads', () => {
+        const id = makeUuid();
+        const replyTo = makeUuid();
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'https://example.com',
+                            item: { ...cookieItem, extra: true }
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'https://example.com',
+                            item: { type: 'localStorage', key: 'syn-key', value: 'syn-value', extra: true }
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerResponse(ROLE.CLIENT, id, makeUuid(), replyTo),
+                        payload: {
+                            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED,
+                            replyTo,
+                            origin: 'https://example.com',
+                            type: 'cookie',
+                            id: 'syn-name',
+                            extra: true
+                        }
+                    },
+                    { role: ROLE.CLIENT, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerResponse(ROLE.CLIENT, id, makeUuid(), replyTo),
+                        payload: {
+                            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+                            replyTo,
+                            error: 'failed',
+                            extra: true
+                        }
+                    },
+                    { role: ROLE.CLIENT, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerResponse(ROLE.CLIENT, id, makeUuid(), replyTo),
+                        payload: { kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR, replyTo, error: 'busy' }
+                    },
+                    { role: ROLE.CLIENT, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'https://example.com',
+                            item: { ...cookieItem, secure: 'yes' }
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'https://example.com',
+                            item: {
+                                ...cookieItem,
+                                partitionKey: { topLevelSite: 'https://example.com', extra: true }
+                            }
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+    });
+
+    it('rejects a non-object item and a non-URL origin', () => {
+        const id = makeUuid();
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'https://example.com',
+                            item: 'syn-value'
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'not-a-url',
+                            item: cookieItem
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+        expectKind(
+            () =>
+                parsePeer(
+                    {
+                        ...basePeerRequest(ROLE.HOST, id, makeUuid()),
+                        payload: {
+                            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                            origin: 'https://example.com',
+                            item: { ...cookieItem, expirationDate: 'later' }
+                        }
+                    },
+                    { role: ROLE.HOST, connectionId: id }
+                ),
+            ERROR_KIND.MALFORMED
+        );
+    });
+});
+
 // helper keeps the imported literal in scope without an unused import warning
 const PayloadKind_ECHO = PAYLOAD_KIND.ECHO;

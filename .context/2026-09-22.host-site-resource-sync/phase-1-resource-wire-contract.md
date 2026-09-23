@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 phase: 1
 order: 1
 plan: plan-host-site-resource-sync.md
@@ -20,15 +20,16 @@ from_plan_steps: [1, 3]
 depends_on: []
 dependency_type: NONE
 acceptance_criteria:
-  - "[ ] `public/manifest.json` adds `*://*/*` to `optional_host_permissions` only; `cookies` and `scripting` stay optional permissions; `host_permissions` unchanged."
-  - "[ ] `src/shared/lib/resources.ts` exports cookie identity (`name + domain + path + partitionKey + storeId`) and localStorage identity (`origin + key`) helpers, the origin filter (non-http(s), `RESTRICTED` schemes, and incognito excluded), and the permission-object builder `{ permissions: ['cookies', 'scripting'], origins: [`${origin}/*`] }`."
-  - "[ ] `MSG` gains `RESOURCE_LIST_SITES`, `RESOURCE_ENABLE`, `RESOURCE_LIST_ITEMS`, `RESOURCE_SUBSCRIBE`, `RESOURCE_UNSUBSCRIBE`, `RESOURCE_STATUS`; payload kinds gain `resource_upsert` with the closed error enum for `resource_applied` / `resource_error`."
-  - "[ ] Envelope encode/parse handles the three new kinds; strict parse fails closed on unknown fields, missing `origin`, and unpaired `connectionId`."
-  - "[ ] A single item whose JSON payload would exceed 48 KiB is rejected before send; the envelope cap reuses `PEER_MAX_BYTES` (96 KiB)."
-  - "[ ] `src/shared/lib/peer.ts` allows the new kinds through the existing `sendRequest` path; `src/offscreen/index.ts` forwards them only when `pairing.isAuthorized(connectionId)`."
-  - "[ ] `__tests__/envelope.test.ts` covers malformed, oversize, and unknown-kind cases and passes; existing Slack/pairing/envelope suites stay green."
-completed_at: null
-completed_by: null
+  - "[x] `public/manifest.json` adds `*://*/*` to `optional_host_permissions` only; `cookies` and `scripting` stay optional permissions; `host_permissions` unchanged."
+  - "[x] `src/shared/lib/resources.ts` exports cookie identity (`name + domain + path + partitionKey + storeId`) and localStorage identity (`origin + key`) helpers, the origin filter (non-http(s), `RESTRICTED` schemes, and incognito excluded), and the permission-object builder `{ permissions: ['cookies', 'scripting'], origins: [`${origin}/*`] }`."
+  - "[x] `MSG` gains `RESOURCE_LIST_SITES`, `RESOURCE_ENABLE`, `RESOURCE_LIST_ITEMS`, `RESOURCE_SUBSCRIBE`, `RESOURCE_UNSUBSCRIBE`, `RESOURCE_STATUS`; payload kinds gain `resource_upsert` with the closed error enum for `resource_applied` / `resource_error`."
+  - "[x] Envelope encode/parse handles the three new kinds; strict parse fails closed on unknown fields, missing `origin`, and unpaired `connectionId`."
+  - "[x] A single item whose JSON payload would exceed 48 KiB is rejected before send; the envelope cap reuses `PEER_MAX_BYTES` (96 KiB)."
+  - "[x] `src/shared/lib/peer.ts` allows the new kinds through the existing `sendRequest` path; `src/offscreen/index.ts` forwards them only when `pairing.isAuthorized(connectionId)`."
+  - "[x] `__tests__/envelope.test.ts` covers malformed, oversize, and unknown-kind cases and passes; existing Slack/pairing/envelope suites stay green."
+completed_at: 2026-09-22
+completed_by: b-build-hard
+memory: [host-site-resource-sync-phase-1-2026-09-22.md]
 ---
 
 # Phase 1: Wire contract and permission foundation

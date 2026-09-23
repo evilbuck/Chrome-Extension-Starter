@@ -23,10 +23,12 @@ import {
     type PayloadKind
 } from '@/shared/constants';
 import {
+    isResourceRequestKind,
     isSlackRequestKind,
     type PeerEnvelope,
     type PeerPayload,
-    type PeerResponsePayload
+    type PeerResponsePayload,
+    type ResourceUpsertPayload
 } from '@/shared/lib/envelope';
 import { logger } from '@/shared/lib/logger';
 import { isPairingCommand } from '@/shared/lib/pairing-protocol';
@@ -111,10 +113,71 @@ const handleSlackInbound = (envelope: PeerEnvelope): void => {
     })();
 };
 
+const handleResourceInbound = (envelope: PeerEnvelope): void => {
+    const peer = pairing.getPeer();
+    if (pairing.getRole() !== 'client' || !peer) return;
+    if (!pairing.isAuthorized(envelope.connectionId)) return;
+    if (typeof envelope.replyTo === 'string') return;
+    if (envelope.payload.kind !== PAYLOAD_KIND.RESOURCE_UPSERT) return;
+    const payload = envelope.payload;
+    const respondingPeer = peer;
+    const respondingConnection = envelope.connectionId;
+    void (async () => {
+        let reply: PeerResponsePayload = {
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+            replyTo: envelope.requestId,
+            error: 'failed'
+        };
+        try {
+            const res: unknown = await chrome.runtime.sendMessage({
+                type: MSG.OFFSCREEN_APP_INBOUND,
+                payload: {
+                    kind: payload.kind,
+                    origin: payload.origin,
+                    item: payload.item,
+                    requestId: envelope.requestId,
+                    connectionId: envelope.connectionId,
+                    deadline: envelope.deadline
+                }
+            });
+            if (
+                res &&
+                typeof res === 'object' &&
+                !Array.isArray(res) &&
+                'kind' in res &&
+                (res.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED ||
+                    res.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR)
+            ) {
+                reply = { ...(res as PeerResponsePayload), replyTo: envelope.requestId };
+            }
+        } catch {
+            // Worker revival: do not leak values; reply failed.
+        }
+        if (
+            pairing.getPeer() !== respondingPeer ||
+            pairing.getConnectionId() !== respondingConnection ||
+            !pairing.isAuthorized(respondingConnection) ||
+            Date.now() >= envelope.deadline
+        )
+            return;
+        try {
+            const left = envelope.deadline - Date.now();
+            respondingPeer.sendReply(reply, left);
+        } catch (err) {
+            const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
+            logger.debug('[offscreen] resource reply failed:', kind);
+        }
+    })();
+};
+
 const handleInboundPeerMessage = (envelope: PeerEnvelope): void => {
     if (!pairing.isAuthorized(envelope.connectionId)) return;
     if (isSlackRequestKind(envelope.payload.kind)) {
         handleSlackInbound(envelope);
+        return;
+    }
+    if (isResourceRequestKind(envelope.payload.kind)) {
+        handleResourceInbound(envelope);
         return;
     }
 
@@ -181,6 +244,78 @@ const statusPayload = () => {
         pairing: pairing.snapshot(),
         error: pairing.getLastError()
     };
+};
+
+const handleAppRequest = (p: Record<string, unknown>, sendResponse: (response: unknown) => void): boolean => {
+    if (!('kind' in p) || !('deadlineMs' in p)) {
+        sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+        return false;
+    }
+    const kind = p.kind;
+    if (kind === PAYLOAD_KIND.RESOURCE_UPSERT) {
+        if (pairing.getRole() !== 'host') {
+            sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
+            return false;
+        }
+    } else if (pairing.getRole() !== 'client') {
+        sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
+        return false;
+    }
+    const peer = pairing.getPeer();
+    const connectionId = pairing.getConnectionId();
+    if (
+        !peer ||
+        !connectionId ||
+        !pairing.isAuthorized(connectionId) ||
+        pairing.getLifecycle() !== LIFECYCLE.CONNECTED
+    ) {
+        sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
+        return false;
+    }
+    if (typeof p.deadlineMs !== 'number' || p.deadlineMs <= 0) {
+        sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+        return false;
+    }
+    if (typeof p.connectionId !== 'string' || p.connectionId !== connectionId) {
+        sendResponse({ ok: false, error: ERROR_KIND.CONNECTION_ID_MISMATCH });
+        return false;
+    }
+    if (!pairing.isAuthorized(p.connectionId)) {
+        sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
+        return false;
+    }
+    let payload: PeerPayload;
+    if (kind === PAYLOAD_KIND.RESOURCE_UPSERT) {
+        if (typeof p.origin !== 'string' || typeof p.item !== 'object' || p.item === null) {
+            sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+            return false;
+        }
+        payload = {
+            kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+            origin: p.origin,
+            item: p.item as ResourceUpsertPayload['item']
+        };
+    } else if (kind === PAYLOAD_KIND.SLACK_LIST) {
+        payload = { kind: PAYLOAD_KIND.SLACK_LIST };
+    } else if (
+        (kind === PAYLOAD_KIND.SLACK_CAPTURE || kind === PAYLOAD_KIND.SLACK_VERIFY) &&
+        'source' in p &&
+        isSlackSource(p.source)
+    ) {
+        payload = { kind, source: p.source };
+    } else {
+        sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
+        return false;
+    }
+    peer.sendRequest(payload, p.deadlineMs)
+        .then((envelope) => {
+            sendResponse({ ok: true, payload: envelope.payload });
+        })
+        .catch((err: unknown) => {
+            const sendKind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
+            sendResponse({ ok: false, error: sendKind });
+        });
+    return true;
 };
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
@@ -264,61 +399,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         }
 
         case MSG.OFFSCREEN_APP_REQUEST: {
-            if (pairing.getRole() !== 'client') {
-                sendResponse({ ok: false, error: ERROR_KIND.ROLE_MISMATCH });
-                return false;
-            }
-            const peer = pairing.getPeer();
-            const connectionId = pairing.getConnectionId();
-            if (
-                !peer ||
-                !connectionId ||
-                !pairing.isAuthorized(connectionId) ||
-                pairing.getLifecycle() !== LIFECYCLE.CONNECTED
-            ) {
-                sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
-                return false;
-            }
             const p = obj.payload;
-            if (!p || typeof p !== 'object' || Array.isArray(p) || !('kind' in p) || !('deadlineMs' in p)) {
+            if (!p || typeof p !== 'object' || Array.isArray(p)) {
                 sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
                 return false;
             }
-            if (typeof p.deadlineMs !== 'number' || p.deadlineMs <= 0) {
-                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
-                return false;
-            }
-            if (!('connectionId' in p) || typeof p.connectionId !== 'string' || p.connectionId !== connectionId) {
-                sendResponse({ ok: false, error: ERROR_KIND.CONNECTION_ID_MISMATCH });
-                return false;
-            }
-            if (!pairing.isAuthorized(p.connectionId)) {
-                sendResponse({ ok: false, error: ERROR_KIND.NO_ACTIVE_REQUEST });
-                return false;
-            }
-            const kind = p.kind;
-            let payload: PeerPayload;
-            if (kind === PAYLOAD_KIND.SLACK_LIST) {
-                payload = { kind: PAYLOAD_KIND.SLACK_LIST };
-            } else if (
-                (kind === PAYLOAD_KIND.SLACK_CAPTURE || kind === PAYLOAD_KIND.SLACK_VERIFY) &&
-                'source' in p &&
-                isSlackSource(p.source)
-            ) {
-                payload = { kind, source: p.source };
-            } else {
-                sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
-                return false;
-            }
-            peer.sendRequest(payload, p.deadlineMs)
-                .then((envelope) => {
-                    sendResponse({ ok: true, payload: envelope.payload });
-                })
-                .catch((err: unknown) => {
-                    const kind = (err as { kind?: ErrorKind }).kind ?? ERROR_KIND.UNKNOWN;
-                    sendResponse({ ok: false, error: kind });
-                });
-            return true;
+            return handleAppRequest(p as Record<string, unknown>, sendResponse);
         }
 
         case MSG.OFFSCREEN_CLOSE: {

@@ -99,15 +99,16 @@ export const ERROR_KIND = {
 export type ErrorKind = (typeof ERROR_KIND)[keyof typeof ERROR_KIND];
 
 // Peer payload kinds. Synthetic echo/ping stay on the existing channel;
-// Slack application variants are typed slots on the same envelope, never
-// generic credential blobs.
+// Slack application variants and user-checked resource upserts are typed
+// slots on the same envelope, never generic credential blobs.
 export const PAYLOAD_KIND = {
     ECHO: 'echo',
     PING: 'ping',
     CANCEL: 'cancel',
     SLACK_LIST: 'slack_list',
     SLACK_CAPTURE: 'slack_capture',
-    SLACK_VERIFY: 'slack_verify'
+    SLACK_VERIFY: 'slack_verify',
+    RESOURCE_UPSERT: 'resource_upsert'
 } as const;
 export type PayloadKind = (typeof PAYLOAD_KIND)[keyof typeof PAYLOAD_KIND];
 
@@ -116,7 +117,9 @@ export const PAYLOAD_RESPONSE_KIND = {
     SLACK_SOURCES: 'slack_sources',
     SLACK_SESSION: 'slack_session',
     SLACK_VERIFIED: 'slack_verified',
-    SLACK_ERROR: 'slack_error'
+    SLACK_ERROR: 'slack_error',
+    RESOURCE_APPLIED: 'resource_applied',
+    RESOURCE_ERROR: 'resource_error'
 } as const;
 export type PayloadResponseKind = (typeof PAYLOAD_RESPONSE_KIND)[keyof typeof PAYLOAD_RESPONSE_KIND];
 
@@ -124,6 +127,27 @@ export type PayloadResponseKind = (typeof PAYLOAD_RESPONSE_KIND)[keyof typeof PA
 // human interaction; transport timeout is independent and bounded.
 export const REQUEST_DEADLINE_MS = 5 * 60 * 1000;
 export const REQUEST_TRANSPORT_TIMEOUT_MS = 30 * 1000;
+
+/** Reject a single resource item whose JSON would exceed this size. */
+export const RESOURCE_ITEM_MAX_BYTES = 48 * 1024;
+
+export const RESOURCE_ERROR = {
+    PERMISSION_DENIED: 'permission_denied',
+    OVERSIZED: 'oversized',
+    NO_DOCUMENT: 'no_document',
+    DISCONNECTED: 'disconnected',
+    MALFORMED: 'malformed',
+    FAILED: 'failed'
+} as const;
+export type ResourceError = (typeof RESOURCE_ERROR)[keyof typeof RESOURCE_ERROR];
+export const RESOURCE_ERRORS = [
+    RESOURCE_ERROR.PERMISSION_DENIED,
+    RESOURCE_ERROR.OVERSIZED,
+    RESOURCE_ERROR.NO_DOCUMENT,
+    RESOURCE_ERROR.DISCONNECTED,
+    RESOURCE_ERROR.MALFORMED,
+    RESOURCE_ERROR.FAILED
+] as const;
 
 export enum MSG {
     // Offscreen lifecycle. Worker → offscreen.
@@ -153,7 +177,15 @@ export enum MSG {
 
     // Slack consent + source listing. popup/options → worker.
     SLACK_ENABLE = 'SLACK_ENABLE',
-    SLACK_LIST = 'SLACK_LIST'
+    SLACK_LIST = 'SLACK_LIST',
+
+    // Host options resource sync. options.html → worker.
+    RESOURCE_LIST_SITES = 'RESOURCE_LIST_SITES',
+    RESOURCE_ENABLE = 'RESOURCE_ENABLE',
+    RESOURCE_LIST_ITEMS = 'RESOURCE_LIST_ITEMS',
+    RESOURCE_SUBSCRIBE = 'RESOURCE_SUBSCRIBE',
+    RESOURCE_UNSUBSCRIBE = 'RESOURCE_UNSUBSCRIBE',
+    RESOURCE_STATUS = 'RESOURCE_STATUS'
 }
 
 export const MESSAGE_SPEC = {
@@ -282,6 +314,30 @@ export const MESSAGE_SPEC = {
     [MSG.SLACK_LIST]: {
         req: {} as Record<string, never>,
         res: {} as { ok: true; sources: unknown[] } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_LIST_SITES]: {
+        req: {} as Record<string, never>,
+        res: {} as { ok: true; origins: string[] } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_ENABLE]: {
+        req: {} as { origin: string },
+        res: {} as { ok: true } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_LIST_ITEMS]: {
+        req: {} as { origin: string },
+        res: {} as { ok: true; cookies: unknown[]; localStorageKeys: unknown[] } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_SUBSCRIBE]: {
+        req: {} as { origin: string; id: string },
+        res: {} as { ok: true } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_UNSUBSCRIBE]: {
+        req: {} as { origin: string; id: string },
+        res: {} as { ok: true } | { ok: false; error: string }
+    },
+    [MSG.RESOURCE_STATUS]: {
+        req: {} as Record<string, never>,
+        res: {} as { ok: true; items: unknown[] } | { ok: false; error: string }
     }
 } as const;
 
