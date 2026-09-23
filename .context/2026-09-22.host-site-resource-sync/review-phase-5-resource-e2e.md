@@ -20,7 +20,7 @@ The smoke recorded in `verification-phase-5-results.md` shows a fresh pair, host
 
 The first granted reconnect opened two inactive `https://example.com` tabs for one localStorage subscription. `openDocument` keeps one per-origin promise through document readiness for a tracked tab, an existing tab, or a newly created tab. It records `opened` only for a tab this feature creates. A loading non-origin URL is not rejected; a mismatched URL is rejected only once the tab is `complete`.
 
-The race regression waits for the fourth `aborted` call, which is inside `applyStorage` immediately before `openDocument`, then asserts one `tabs.create`, then emits completion. An earlier full guardrails run reported that the first apply returned `resource_error`. The `error` field was not in that report, and rerunning the previous microtask-flush test under coverage did not reproduce a failure, so that field is unavailable. The proven problem in that test was the barrier: microtask flushes do not show that the second apply has reached `openDocument`. That does not establish why the first apply returned `resource_error`.
+The race regression waits for the fourth `aborted` call, which is inside `applyStorage` immediately before `openDocument`, then asserts one `tabs.create`, then emits completion. A later authoritative run returned `{ kind: 'resource_error', error: 'failed' }` for the first apply. That was not a missed join. Node v26.8.1 leaves `localStorage` unset unless `--localstorage-file` is set, and the shared `executeScript` mock ran `writeLocalStorageValue` against that ambient storage. The race test now returns a scoped `{ result: true }`. `__tests__/setup-promise.ts` installs an in-memory `Storage` when `clear` is missing so the rest of the suite does not call `localStorage.clear()` on an unset global.
 
 ## Standards axis
 
@@ -28,7 +28,7 @@ Worst finding: none. Sharing the open does not skip `permissions.contains`.
 
 ## Guardrails
 
-Three consecutive fresh runs of `node skills/b-guardrails-check/scripts/check.mjs --cwd` this repo returned durable status pass. Unit pass. Lint pass. Functional skipped. Patch, ratchet, and complexity pass. Coverage 91.6%.
+Three consecutive fresh runs of the guardrails check on Node v26.8.1 (`~/.local/share/mise/installs/node/latest/bin/node`) returned durable status pass after the storage shim. Unit exit 0. Lint, patch, ratchet, and complexity pass. Functional skipped. Coverage 91.6%.
 
 ## Documentation impact
 
