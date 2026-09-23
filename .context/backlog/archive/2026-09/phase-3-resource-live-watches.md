@@ -1,10 +1,10 @@
 ---
 title: Resources Phase 3: Subscriptions and live watches
-status: active
+status: completed
 priority: high
 created: 2026-09-22
 updated: 2026-09-22
-completed: null
+completed: 2026-09-22
 related:
   - .context/2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md
   - .context/2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md

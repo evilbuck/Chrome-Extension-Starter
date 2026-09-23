@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 phase: 3
 order: 3
 plan: plan-host-site-resource-sync.md
@@ -18,16 +18,16 @@ from_plan_steps: [4, 5, 6, 8]
 depends_on: [2]
 dependency_type: HARD
 acceptance_criteria:
-  - "[ ] `StorageSchema.local` gains the subscription record (identities only, never values); subscriptions survive worker revival and re-arm their listeners/polls."
-  - "[ ] Checking an item persists the identity, snapshots the current value, and sends one `resource_upsert` per item over the authorized channel; cookies carry the full field set from the wire contract."
-  - "[ ] Unchecking removes the identity only — no further pushes, and no delete/remove frame of any kind."
-  - "[ ] `chrome.cookies.onChanged` filtered to subscribed identities: `overwrite`/`explicit` sets push the updated value; a host-side removal neither unsubscribes nor sends a delete (next set upserts again)."
-  - "[ ] While a same-origin non-incognito host tab exists, subscribed localStorage keys are polled via `executeScript` `localStorage.getItem` and upserted on value change; when the last same-origin host tab closes, items are marked `paused` (stay checked, polling stops); a later same-origin tab resumes polling and pushes current values; a completed load triggers a rescan."
-  - "[ ] `RESOURCE_STATUS` returns subscriptions plus paused/error state per item, shown in the panel."
-  - "[ ] Unpaired or unauthorized: sending stops, subscriptions persist; reconnect resumes the cookie listener and localStorage poll; forgetting the pair keeps subscriptions until a new authorized pair exists."
-  - "[ ] Tests pass: subscribe-sends-current-value, uncheck-stops-and-never-deletes (no `cookies.remove` / `removeItem`), cookie `onChanged` push, localStorage pause/resume, no-send-while-unpaired — synthetic values only."
-completed_at: null
-completed_by: null
+  - "[x] `StorageSchema.local` gains the subscription record (identities only, never values); subscriptions survive worker revival and re-arm their listeners/polls."
+  - "[x] Checking an item persists the identity, snapshots the current value, and sends one `resource_upsert` per item over the authorized channel; cookies carry the full field set from the wire contract."
+  - "[x] Unchecking removes the identity only — no further pushes, and no delete/remove frame of any kind."
+  - "[x] `chrome.cookies.onChanged` filtered to subscribed identities: `overwrite`/`explicit` sets push the updated value; a host-side removal neither unsubscribes nor sends a delete (next set upserts again)."
+  - "[x] While a same-origin non-incognito host tab exists, subscribed localStorage keys are polled via `executeScript` `localStorage.getItem` and upserted on value change; when the last same-origin host tab closes, items are marked `paused` (stay checked, polling stops); a later same-origin tab resumes polling and pushes current values; a completed load triggers a rescan."
+  - "[x] `RESOURCE_STATUS` returns subscriptions plus paused/error state per item, shown in the panel."
+  - "[x] Unpaired or unauthorized: sending stops, subscriptions persist; reconnect resumes the cookie listener and localStorage poll; forgetting the pair keeps subscriptions until a new authorized pair exists."
+  - "[x] Tests pass: subscribe-sends-current-value, uncheck-stops-and-never-deletes (no `cookies.remove` / `removeItem`), cookie `onChanged` push, localStorage pause/resume, no-send-while-unpaired — synthetic values only."
+completed_at: 2026-09-22
+completed_by: b-build
 ---
 
 # Phase 3: Subscriptions and live watches

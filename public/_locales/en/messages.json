@@ -271,6 +271,8 @@
   "resourceCookiesTitle": { "message": "Cookies" },
   "resourceStorageTitle": { "message": "localStorage" },
   "resourceStorageUnreadable": { "message": "localStorage is unreadable from this site tab." },
+  "resourcePaused": { "message": "Paused until a same-site tab is open." },
+  "resourceSyncFailed": { "message": "The latest value could not be sent. It will retry while checked." },
   "resourcePermissionDenied": { "message": "Site access was not granted." },
   "resourceLoadFailed": { "message": "Site resources could not be loaded." }
 }

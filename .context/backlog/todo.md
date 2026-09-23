@@ -11,9 +11,8 @@ New options-page feature, independent of the LAN login phase queue. Plan phased 
 
 ## Upcoming resource sync phases
 
-Phase 3 is next; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
+Phase 4 is next; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
 
-- [ ] [Resources Phase 3: Subscriptions and live watches](items/phase-3-resource-live-watches.md)
 - [ ] [Resources Phase 4: Client apply and inbound lifecycle](items/phase-4-resource-client-apply.md)
 - [ ] [Resources Phase 5: End-to-end verification and docs](items/phase-5-resource-e2e-docs.md)
 - [ ] [Phase 1: Record experiment boundary](items/phase-1-experiment-boundary.md)

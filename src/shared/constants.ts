@@ -235,8 +235,14 @@ export const MESSAGE_SPEC = {
     },
     [MSG.OFFSCREEN_APP_REQUEST]: {
         req: {} as {
-            kind: typeof PAYLOAD_KIND.SLACK_LIST | typeof PAYLOAD_KIND.SLACK_CAPTURE | typeof PAYLOAD_KIND.SLACK_VERIFY;
+            kind:
+                | typeof PAYLOAD_KIND.SLACK_LIST
+                | typeof PAYLOAD_KIND.SLACK_CAPTURE
+                | typeof PAYLOAD_KIND.SLACK_VERIFY
+                | typeof PAYLOAD_KIND.RESOURCE_UPSERT;
             source?: unknown;
+            origin?: string;
+            item?: unknown;
             deadlineMs: number;
             connectionId: string;
         },
@@ -330,11 +336,11 @@ export const MESSAGE_SPEC = {
             | { ok: false; error: string }
     },
     [MSG.RESOURCE_SUBSCRIBE]: {
-        req: {} as { origin: string; id: string },
+        req: {} as { origin: string; item: unknown },
         res: {} as { ok: true } | { ok: false; error: string }
     },
     [MSG.RESOURCE_UNSUBSCRIBE]: {
-        req: {} as { origin: string; id: string },
+        req: {} as { origin: string; item: unknown },
         res: {} as { ok: true } | { ok: false; error: string }
     },
     [MSG.RESOURCE_STATUS]: {

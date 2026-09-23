@@ -1,0 +1,22 @@
+{
+  "legal": [
+    {
+      "kind": "retry"
+    },
+    {
+      "kind": "advance"
+    },
+    {
+      "kind": "block"
+    }
+  ],
+  "raw": "{\"choice\":\"block\",\"reason\":\"Postcondition scan returned ambiguous for the documenting phase with docs/howto impact true. Cannot advance to shipping documentation when completion criteria are not verifiably satisfied; retrying may not resolve structural ambiguity. Block until postcondition interpretation is clarified or the scan is repaired to produce a deterministic verdict.\"}",
+  "parsed": {
+    "choice": "block",
+    "reason": "Postcondition scan returned ambiguous for the documenting phase with docs/howto impact true. Cannot advance to shipping documentation when completion criteria are not verifiably satisfied; retrying may not resolve structural ambiguity. Block until postcondition interpretation is clarified or the scan is repaired to produce a deterministic verdict."
+  },
+  "accepted": true,
+  "reason": "Postcondition scan returned ambiguous for the documenting phase with docs/howto impact true. Cannot advance to shipping documentation when completion criteria are not verifiably satisfied; retrying may not resolve structural ambiguity. Block until postcondition interpretation is clarified or the scan is repaired to produce a deterministic verdict.",
+  "context": "state=documenting phase=.context/2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md why=postcondition scan ambiguous parseable=true docsImpact=true howtoImpact=true postcondition=ambiguous",
+  "attempt": 1
+}

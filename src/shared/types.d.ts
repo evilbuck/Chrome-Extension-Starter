@@ -3,6 +3,7 @@
 // drops the demo fields (favoriteColor, darkMode, etc.). The MESSAGE_SPEC
 // map type is unchanged so the existing typed bus keeps working.
 
+import type { ResourceSubscription } from '@/background/apps/resources';
 import type { MSG, MESSAGE_SPEC } from '@/shared/constants';
 
 export type InferMessageMap<T extends Record<string, string>> = {
@@ -37,6 +38,7 @@ export interface StorageSchema {
     local: {
         role: 'host' | 'client' | null;
         connectionMetadata: { connectionId: string | null; lastConnectedAt: number | null };
+        resourceSubscriptions: ResourceSubscription[];
     };
     session: {
         activeRequestId: string | null;

@@ -29,7 +29,7 @@
     "service_worker": "static/js/background.js",
     "type": "module"
   },
-  "permissions": ["storage", "tabs", "offscreen"],
+  "permissions": ["storage", "tabs", "offscreen", "alarms"],
   "host_permissions": ["https://beam-me-up-pairing.buck-f11.workers.dev/*"],
   "optional_permissions": ["cookies", "scripting"],
   "optional_host_permissions": ["https://slack.com/*", "https://app.slack.com/*", "*://*/*"],

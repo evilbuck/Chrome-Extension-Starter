@@ -20,6 +20,8 @@ status: active
 
 # Session memory index
 
+- [2026-09-22 — Host site resource sync Phase 3](host-site-resource-sync-phase-3-2026-09-22.md): persistent identity-only subscriptions, normalized revival state, pause-aware durable localStorage watches, queued reconnect refreshes, and selection-safe status polling. Final iteration verification: production bundle, 455 unit tests, and diff-scoped lint pass. Next: re-review, then Phase 4. [Phase](../2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md).
+
 - [2026-09-22 — Host site resource sync Phase 2](host-site-resource-sync-phase-2-2026-09-22.md): authorized-host site picker, user-gesture per-origin permission, metadata-only cookie/localStorage lists, unreadable-storage state, options-only worker routing, and partition-aware cookie identity/display. Browser smoke and durable guardrails pass; review iteration adds a 436-test light-gate pass. Next: re-review, then Phase 3. [Phase](../2026-09-22.host-site-resource-sync/phase-2-resource-site-panel.md).
 
 - [2026-09-22 — Host site resource sync Phase 1](host-site-resource-sync-phase-1-2026-09-22.md): optional `*://*/*` host permissions, identities, `resource_upsert`/`applied`/`error` with 48 KiB/96 KiB caps, authorized offscreen forward. Guardrails pass. Review warning: host send does not re-parse item. Next: Phase 2. [Phase](../2026-09-22.host-site-resource-sync/phase-1-resource-wire-contract.md).

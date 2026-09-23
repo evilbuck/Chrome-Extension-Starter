@@ -24,7 +24,12 @@
 // Each command has a runtime payload validator. The worker forwards pairing
 // commands to the offscreen by tagging them with `target: OFFSCREEN_TARGET`.
 
-import { enableResourceOrigin, listResourceItems, listResourceSites } from '@/background/apps/resources';
+import {
+    createResourceSync,
+    enableResourceOrigin,
+    listResourceItems,
+    listResourceSites
+} from '@/background/apps/resources';
 import {
     applySlackSession,
     captureSlackSession,
@@ -61,6 +66,7 @@ import {
     ROLE,
     type Role
 } from '@/shared/constants';
+import type { ResourceUpsertPayload } from '@/shared/lib/envelope';
 import { logger } from '@/shared/lib/logger';
 import {
     isPairingCode,
@@ -520,6 +526,43 @@ const requireConnected = async (
     return { ok: true, connectionId: status.connectionId };
 };
 
+const asResourceError = (value: unknown): ResourceError =>
+    typeof value === 'string' && (Object.values(RESOURCE_ERROR) as readonly string[]).includes(value)
+        ? (value as ResourceError)
+        : RESOURCE_ERROR.FAILED;
+
+const resourcePeerError = (payload: unknown): ResourceError | null => {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+    const peerPayload = payload as Record<string, unknown>;
+    return peerPayload.kind === PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR ? asResourceError(peerPayload.error) : null;
+};
+
+const resourceSendError = (response: unknown): ResourceError | null => {
+    if (!response || typeof response !== 'object' || Array.isArray(response)) return RESOURCE_ERROR.FAILED;
+    const result = response as Record<string, unknown>;
+    if (result.ok !== true) {
+        return result.error === ERROR_KIND.NO_ACTIVE_REQUEST ? RESOURCE_ERROR.DISCONNECTED : RESOURCE_ERROR.FAILED;
+    }
+    return resourcePeerError(result.payload);
+};
+
+const sendResourcePeer = async (payload: ResourceUpsertPayload): Promise<ResourceError | null> => {
+    const connected = await requireConnected(ROLE.HOST);
+    if (!connected.ok) return RESOURCE_ERROR.DISCONNECTED;
+    const response: unknown = await sendToOffscreen(MSG.OFFSCREEN_APP_REQUEST, {
+        kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+        origin: payload.origin,
+        item: payload.item,
+        connectionId: connected.connectionId,
+        deadlineMs: REQUEST_TRANSPORT_TIMEOUT_MS
+    });
+    return resourceSendError(response);
+};
+
+const resourceSync = createResourceSync(sendResourcePeer);
+void resourceSync.start().catch(() => {
+    // A later resource command retries initialization after transient storage/API failure.
+});
 const runResourceCommand = async <T>(operation: () => Promise<T>): Promise<T | { ok: false; error: ResourceError }> => {
     const connected = await requireConnected(ROLE.HOST);
     if (!connected.ok) {
@@ -534,7 +577,10 @@ const runResourceCommand = async <T>(operation: () => Promise<T>): Promise<T | {
 const RESOURCE_UI_COMMANDS: Record<string, true> = {
     [MSG.RESOURCE_LIST_SITES]: true,
     [MSG.RESOURCE_ENABLE]: true,
-    [MSG.RESOURCE_LIST_ITEMS]: true
+    [MSG.RESOURCE_LIST_ITEMS]: true,
+    [MSG.RESOURCE_SUBSCRIBE]: true,
+    [MSG.RESOURCE_UNSUBSCRIBE]: true,
+    [MSG.RESOURCE_STATUS]: true
 };
 
 const handleResourceUiCommand = async (
@@ -550,6 +596,12 @@ const handleResourceUiCommand = async (
             return runResourceCommand(() => enableResourceOrigin(payload.origin));
         case MSG.RESOURCE_LIST_ITEMS:
             return runResourceCommand(() => listResourceItems(payload.origin));
+        case MSG.RESOURCE_SUBSCRIBE:
+            return runResourceCommand(() => resourceSync.subscribe(payload.origin, payload.item));
+        case MSG.RESOURCE_UNSUBSCRIBE:
+            return runResourceCommand(() => resourceSync.unsubscribe(payload.origin, payload.item));
+        case MSG.RESOURCE_STATUS:
+            return runResourceCommand(resourceSync.status);
         default:
             return { ok: false, error: ERROR_KIND.UNKNOWN_REQUEST };
     }
@@ -810,6 +862,9 @@ const handleOffscreenEvent = (payload: OffscreenEventPayload): void => {
         payload.authorized !== true
     ) {
         invalidateRequest('disconnected');
+    }
+    if (payload.state === LIFECYCLE.CONNECTED && payload.authorized === true && payload.role === ROLE.HOST) {
+        void resourceSync.refresh();
     }
     broadcastState(payload);
 };

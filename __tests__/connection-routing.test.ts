@@ -120,10 +120,18 @@ beforeEach(async () => {
                 { id: 21, url: 'https://example.com/one', incognito: false },
                 { id: 22, url: 'https://example.com/two', incognito: false },
                 { id: 23, url: 'chrome://extensions', incognito: false }
-            ])
+            ]),
+            onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+            onUpdated: { addListener: vi.fn(), removeListener: vi.fn() }
         },
         cookies: {
-            getAll: vi.fn().mockResolvedValue([])
+            getAll: vi.fn().mockResolvedValue([]),
+            onChanged: { addListener: vi.fn(), removeListener: vi.fn() }
+        },
+        alarms: {
+            create: vi.fn(),
+            clear: vi.fn().mockResolvedValue(true),
+            onAlarm: { addListener: vi.fn(), removeListener: vi.fn() }
         },
         scripting: {
             executeScript: vi.fn().mockResolvedValue([{ result: { readable: true, items: [] } }])
@@ -585,6 +593,84 @@ describe('worker command routing', () => {
                 }
             )
         ).toEqual({ ok: false, error: ERROR_KIND.INVALID_SENDER_CONTEXT });
+    });
+
+    it('routes resource subscriptions through the authorized app channel and persists identity only', async () => {
+        (chrome.permissions.contains as Mock).mockResolvedValue(true);
+        (chrome.cookies.getAll as Mock).mockResolvedValue([
+            {
+                name: 'syn-cookie',
+                value: 'synthetic-cookie-value',
+                domain: '.example.com',
+                path: '/',
+                secure: true,
+                httpOnly: true,
+                sameSite: 'lax',
+                session: false,
+                storeId: '0'
+            }
+        ]);
+        const appRequests: Record<string, unknown>[] = [];
+        offscreenReply = (message) => {
+            if (message.type === MSG.OFFSCREEN_STATUS) return connectedStatus(true, 'host');
+            if (message.type === MSG.OFFSCREEN_APP_REQUEST) {
+                appRequests.push(message.payload as Record<string, unknown>);
+                return { ok: true, payload: { kind: 'resource_applied' } };
+            }
+            return { ok: false, error: 'failed' };
+        };
+
+        expect(
+            await deliver(
+                background,
+                {
+                    type: MSG.RESOURCE_SUBSCRIBE,
+                    payload: {
+                        origin: 'https://example.com',
+                        item: {
+                            type: 'cookie',
+                            name: 'syn-cookie',
+                            domain: '.example.com',
+                            path: '/',
+                            storeId: '0'
+                        }
+                    }
+                },
+                optionsSender
+            )
+        ).toEqual({ ok: true });
+
+        expect(appRequests).toEqual([
+            {
+                kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                origin: 'https://example.com',
+                item: {
+                    type: 'cookie',
+                    name: 'syn-cookie',
+                    domain: '.example.com',
+                    path: '/',
+                    secure: true,
+                    httpOnly: true,
+                    sameSite: 'lax',
+                    session: false,
+                    value: 'synthetic-cookie-value'
+                },
+                connectionId,
+                deadlineMs: 30_000
+            }
+        ]);
+        expect(await chrome.storage.local.get('resourceSubscriptions')).toEqual({
+            resourceSubscriptions: [
+                {
+                    type: 'cookie',
+                    origin: 'https://example.com',
+                    name: 'syn-cookie',
+                    domain: '.example.com',
+                    path: '/',
+                    storeId: '0'
+                }
+            ]
+        });
     });
 
     it('returns permission_denied for resource access without optional permission', async () => {
