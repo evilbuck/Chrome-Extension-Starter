@@ -6,7 +6,7 @@ topics: [phasing, options-page, cookies, localStorage, live-sync, host-client, w
 source_plan: plan-host-site-resource-sync.md
 phases: 5
 format: discrete
-memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md, host-site-resource-sync-phase-3-2026-09-22.md]
+memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md, host-site-resource-sync-phase-3-2026-09-22.md, host-site-resource-sync-iterate-2026-09-22.md]
 ---
 
 # Phased Plan: Host options site resource sync

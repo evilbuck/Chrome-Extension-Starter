@@ -12,7 +12,7 @@ related:
 
 # Host options site resource sync
 
-Host options page lists open-tab origins, shows all cookies and localStorage for the selected site, and live-syncs checked items to the paired client. Phased 2026-09-22 into five phases; execute via the [phases overview](../../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md) — Resources Phase 3 is next.
+Host options page lists open-tab origins, shows all cookies and localStorage for the selected site, and live-syncs checked items to the paired client. Phased 2026-09-22 into five phases; execute via the [phases overview](../../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md) — Resources Phase 4 is next.
 
 ## Acceptance criteria
 

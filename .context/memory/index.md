@@ -1,3 +1,7 @@
+- 2026-09-22 — [Host site resource sync Phase 3 pause fix](host-site-resource-sync-iterate-2026-09-22.md) — `completed`
+
+  - 2026-09-22 | `host-site-resource-sync-iterate-2026-09-22.md` | domains: [chrome-extension, resource-sync, testing] | topics: [localStorage, refresh-race, pause-resume, resource-sync] | status: completed
+
 - 2026-09-22 — [buck-loop unblock: Phase 2 false docs block](buck-loop-unblock-2026-09-22.md) — `completed`
 
   - 2026-09-22 | `buck-loop-unblock-2026-09-22.md` | domains: [buck-loop, resource-sync] | topics: [buck-loop, false-block, phase-2, documentation-impact] | status: completed
@@ -20,7 +24,7 @@ status: active
 
 # Session memory index
 
-- [2026-09-22 — Host site resource sync Phase 3](host-site-resource-sync-phase-3-2026-09-22.md): persistent identity-only subscriptions, normalized revival state, pause-aware durable localStorage watches, queued reconnect refreshes, and selection-safe status polling. Final iteration verification: production bundle, 455 unit tests, and diff-scoped lint pass. Next: re-review, then Phase 4. [Phase](../2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md).
+- [2026-09-22 — Host site resource sync Phase 3](host-site-resource-sync-phase-3-2026-09-22.md): persistent identity-only subscriptions and pause-aware localStorage watches. Follow-up review passed after chaining refreshes on a tail queue so a tab close during an in-flight read stays paused. Next: Phase 4. [Phase](../2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md).
 
 - [2026-09-22 — Host site resource sync Phase 2](host-site-resource-sync-phase-2-2026-09-22.md): authorized-host site picker, user-gesture per-origin permission, metadata-only cookie/localStorage lists, unreadable-storage state, options-only worker routing, and partition-aware cookie identity/display. Browser smoke and durable guardrails pass; review iteration adds a 436-test light-gate pass. Next: re-review, then Phase 3. [Phase](../2026-09-22.host-site-resource-sync/phase-2-resource-site-panel.md).
 

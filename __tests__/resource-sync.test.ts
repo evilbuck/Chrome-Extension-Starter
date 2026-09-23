@@ -398,6 +398,38 @@ describe('resource subscriptions and live watches', () => {
         sync.stop();
     });
 
+    it('keeps a tab-close pause when it lands during an in-flight storage read', async () => {
+        const api = makeChrome();
+        vi.stubGlobal('chrome', api);
+        const sent = vi.fn().mockResolvedValue(null);
+        const sync = createResourceSync(sent, 60_000);
+        await sync.start();
+        await sync.subscribe('https://example.com', { type: 'localStorage', key: 'syn-key' });
+        sent.mockClear();
+        api.alarms.create.mockClear();
+        api.alarms.clear.mockClear();
+
+        const read = Promise.withResolvers<Array<{ result: string }>>();
+        api.scripting.executeScript.mockReturnValueOnce(read.promise);
+        api.__events.alarm.emit({ name: 'resource-local-storage-poll', scheduledTime: Date.now() });
+        await waitFor(() => expect(api.scripting.executeScript).toHaveBeenCalled());
+
+        api.__tabs.splice(0, api.__tabs.length);
+        api.__events.tabRemoved.emit(1);
+        read.resolve([{ result: 'syn-value-held' }]);
+        await waitFor(async () => expect((await sync.status()).items[0]).toMatchObject({ paused: true, error: null }));
+
+        expect(sent).toHaveBeenCalledWith({
+            kind: 'resource_upsert',
+            origin: 'https://example.com',
+            item: { type: 'localStorage', key: 'syn-key', value: 'syn-value-held' }
+        });
+        expect((await sync.status()).items[0]).toMatchObject({ paused: true, error: null });
+        expect(api.alarms.clear).toHaveBeenCalledWith('resource-local-storage-poll');
+        expect(api.alarms.create).not.toHaveBeenCalled();
+        sync.stop();
+    });
+
     it('keeps subscriptions while unpaired and sends the current value after reconnect', async () => {
         const api = makeChrome();
         vi.stubGlobal('chrome', api);

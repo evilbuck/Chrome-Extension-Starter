@@ -28,6 +28,7 @@ acceptance_criteria:
   - "[x] Tests pass: subscribe-sends-current-value, uncheck-stops-and-never-deletes (no `cookies.remove` / `removeItem`), cookie `onChanged` push, localStorage pause/resume, no-send-while-unpaired — synthetic values only."
 completed_at: 2026-09-22
 completed_by: b-build
+memory: [host-site-resource-sync-phase-3-2026-09-22.md, host-site-resource-sync-iterate-2026-09-22.md]
 ---
 
 # Phase 3: Subscriptions and live watches

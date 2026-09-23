@@ -4,9 +4,9 @@ date: 2026-09-22
 subject: 2026-09-22.host-site-resource-sync
 topics: [options-page, cookies, localStorage, live-sync, host-client, webrtc]
 research: []
-iterations: []
+iterations: [iterate-host-site-resource-sync.md]
 spec: null
-memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md, host-site-resource-sync-phase-3-2026-09-22.md]
+memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md, host-site-resource-sync-phase-3-2026-09-22.md, host-site-resource-sync-iterate-2026-09-22.md]
 ---
 
 # Plan: Host options site resource sync

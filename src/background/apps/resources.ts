@@ -255,6 +255,8 @@ export const createResourceSync = (send: ResourceSend, pollIntervalMs = 60_000) 
     let alarmScheduled = false;
     let refreshPromise: Promise<void> | null = null;
     let refreshQueued = false;
+    let storageEpoch = 0;
+    let storageTail: Promise<void> = Promise.resolve();
     const paused = new Set<string>();
     const errors = new Map<string, ResourceError>();
     const localValues = new Map<string, string | null>();
@@ -340,23 +342,30 @@ export const createResourceSync = (send: ResourceSend, pollIntervalMs = 60_000) 
         }
     };
 
+    const commitPause = (key: string, epoch: number, isPaused: boolean): void => {
+        if (epoch !== storageEpoch) return;
+        if (isPaused) paused.add(key);
+        else paused.delete(key);
+    };
+
     const refreshLocalStorageSubscription = async (
         subscription: Extract<ResourceSubscription, { type: 'localStorage' }>,
-        tabs: chrome.tabs.Tab[]
+        tabs: chrome.tabs.Tab[],
+        epoch: number
     ): Promise<void> => {
         const key = subscriptionKey(subscription);
         const tab = sameOriginTab(tabs, subscription.origin);
         if (tab?.id === undefined) {
-            paused.add(key);
+            commitPause(key, epoch, true);
             return;
         }
-        paused.delete(key);
+        commitPause(key, epoch, false);
         try {
             const value = await readStorage(tab.id, subscription);
             if (!subscriptions.some((item) => subscriptionKey(item) === key)) return;
             const previous = localValues.get(key);
             if (value === null) {
-                localValues.set(key, null);
+                if (epoch === storageEpoch) localValues.set(key, null);
                 return;
             }
             if (previous === value) return;
@@ -366,32 +375,45 @@ export const createResourceSync = (send: ResourceSend, pollIntervalMs = 60_000) 
                 value
             });
             if (error === null) localValues.set(key, value);
+            commitPause(key, epoch, false);
         } catch {
+            if (epoch !== storageEpoch) return;
             errors.set(key, RESOURCE_ERROR.FAILED);
         }
     };
 
-    const refreshLocalStorage = async (): Promise<void> => {
+    const runLocalStorageRefresh = async (epoch: number): Promise<void> => {
         const localSubscriptions = subscriptions.filter(
             (item): item is Extract<ResourceSubscription, { type: 'localStorage' }> => item.type === 'localStorage'
         );
         if (localSubscriptions.length === 0) {
-            updatePollAlarm();
+            if (epoch === storageEpoch) updatePollAlarm();
             return;
         }
         let tabs: chrome.tabs.Tab[];
         try {
             tabs = await chrome.tabs.query({});
         } catch {
+            if (epoch !== storageEpoch) return;
             for (const subscription of localSubscriptions) {
                 errors.set(subscriptionKey(subscription), RESOURCE_ERROR.FAILED);
             }
             return;
         }
         for (const subscription of localSubscriptions) {
-            await refreshLocalStorageSubscription(subscription, tabs);
+            await refreshLocalStorageSubscription(subscription, tabs, epoch);
         }
-        updatePollAlarm();
+        if (epoch === storageEpoch) updatePollAlarm();
+    };
+
+    const refreshLocalStorage = (): Promise<void> => {
+        const epoch = ++storageEpoch;
+        const run = storageTail.then(() => runLocalStorageRefresh(epoch));
+        storageTail = run.then(
+            () => undefined,
+            () => undefined
+        );
+        return run;
     };
 
     const refreshNow = async (): Promise<void> => {
