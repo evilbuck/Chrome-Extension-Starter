@@ -840,17 +840,24 @@ describe('client resource apply', () => {
         const first = client.apply(request('client', item('syn-a')));
         await vi.waitFor(() => expect(api.tabs.get).toHaveBeenCalled());
         expect(api.tabs.create).toHaveBeenCalledTimes(1);
-        const second = client.apply(request('client', item('syn-b')));
-        await Promise.resolve();
-        await Promise.resolve();
+        const { promise: joined, resolve: markJoined } = Promise.withResolvers<void>();
+        let abortedCalls = 0;
+        const second = client.apply(request('client', item('syn-b')), () => {
+            abortedCalls += 1;
+            if (abortedCalls === 4) markJoined();
+            return false;
+        });
+        await joined;
         expect(api.tabs.create).toHaveBeenCalledTimes(1);
 
         const ready = { id: 90, url: 'https://example.com/', incognito: false, status: 'complete' };
         api.tabs.get.mockResolvedValue(ready);
         api.tabs.onUpdated.emit(90, { status: 'complete' }, ready);
 
-        await expect(first).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-a' });
-        await expect(second).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-b' });
+        const firstResult = await first;
+        const secondResult = await second;
+        expect(firstResult, JSON.stringify(firstResult)).toMatchObject({ kind: 'resource_applied', id: 'syn-a' });
+        expect(secondResult, JSON.stringify(secondResult)).toMatchObject({ kind: 'resource_applied', id: 'syn-b' });
         expect(api.tabs.create).toHaveBeenCalledTimes(1);
         expect(api.scripting.executeScript).toHaveBeenCalledTimes(2);
     });
