@@ -114,6 +114,19 @@ beforeEach(async () => {
         },
         permissions: {
             contains: vi.fn().mockResolvedValue(false)
+        },
+        tabs: {
+            query: vi.fn().mockResolvedValue([
+                { id: 21, url: 'https://example.com/one', incognito: false },
+                { id: 22, url: 'https://example.com/two', incognito: false },
+                { id: 23, url: 'chrome://extensions', incognito: false }
+            ])
+        },
+        cookies: {
+            getAll: vi.fn().mockResolvedValue([])
+        },
+        scripting: {
+            executeScript: vi.fn().mockResolvedValue([{ result: { readable: true, items: [] } }])
         }
     });
     // Module listeners bind to this test's Chrome stub.
@@ -551,6 +564,41 @@ describe('worker command routing', () => {
         ).toEqual({ ok: true });
         expect(chrome.storage.local.set).toHaveBeenCalledWith({ [SLACK_SHARING_APPROVED]: true });
         expect(await chrome.storage.local.get(SLACK_SHARING_APPROVED)).toEqual({ [SLACK_SHARING_APPROVED]: true });
+    });
+
+    it('routes resource commands only from options for an authorized host', async () => {
+        offscreenReply = (message) => {
+            if (message.type === MSG.OFFSCREEN_STATUS) return connectedStatus(true, 'host');
+            return { ok: false, error: 'disconnected' };
+        };
+        expect(await deliver(background, { type: MSG.RESOURCE_LIST_SITES }, optionsSender)).toEqual({
+            ok: true,
+            origins: ['https://example.com']
+        });
+        expect(
+            await deliver(
+                background,
+                { type: MSG.RESOURCE_LIST_SITES },
+                {
+                    id: extensionId,
+                    url: url('popup.html')
+                }
+            )
+        ).toEqual({ ok: false, error: ERROR_KIND.INVALID_SENDER_CONTEXT });
+    });
+
+    it('returns permission_denied for resource access without optional permission', async () => {
+        offscreenReply = (message) => {
+            if (message.type === MSG.OFFSCREEN_STATUS) return connectedStatus(true, 'host');
+            return { ok: false, error: 'disconnected' };
+        };
+        expect(
+            await deliver(
+                background,
+                { type: MSG.RESOURCE_ENABLE, payload: { origin: 'https://example.com' } },
+                optionsSender
+            )
+        ).toEqual({ ok: false, error: 'permission_denied' });
     });
 
     it('rejects SLACK_LIST without sharing approval', async () => {

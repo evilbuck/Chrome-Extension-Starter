@@ -6,7 +6,7 @@ topics: [phasing, options-page, cookies, localStorage, live-sync, host-client, w
 source_plan: plan-host-site-resource-sync.md
 phases: 5
 format: discrete
-memory: [host-site-resource-sync-phase-1-2026-09-22.md]
+memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md]
 ---
 
 # Phased Plan: Host options site resource sync
@@ -25,7 +25,7 @@ memory: [host-site-resource-sync-phase-1-2026-09-22.md]
 | Phase | Status | Difficulty | omp_execution | File |
 |-------|--------|------------|---------------|------|
 | 1: Wire contract and permission foundation | completed | hard | none | [phase-1-resource-wire-contract.md](phase-1-resource-wire-contract.md) |
-| 2: Host site picker and resource panel | pending | medium | none | [phase-2-resource-site-panel.md](phase-2-resource-site-panel.md) |
+| 2: Host site picker and resource panel | completed | medium | none | [phase-2-resource-site-panel.md](phase-2-resource-site-panel.md) |
 | 3: Subscriptions and live watches | pending | medium | none | [phase-3-resource-live-watches.md](phase-3-resource-live-watches.md) |
 | 4: Client apply and inbound lifecycle | pending | hard | none | [phase-4-resource-client-apply.md](phase-4-resource-client-apply.md) |
 | 5: End-to-end verification and docs | pending | easy | none | [phase-5-resource-e2e-docs.md](phase-5-resource-e2e-docs.md) |
@@ -97,7 +97,7 @@ Use this overview as the durable navigation map for an OMP execution session. Fo
 ## Execution Checklist
 
 - [x] Phase 1: Wire contract and permission foundation — build → review → iterate if in-plan issues → docs if doc impact → save → commit
-- [ ] Phase 2: Host site picker and resource panel — build → review → iterate if in-plan issues → docs if doc impact → save → commit
+- [x] Phase 2: Host site picker and resource panel — build → review → iterate if in-plan issues → docs if doc impact → save → commit
 - [ ] Phase 3: Subscriptions and live watches — build → review → iterate if in-plan issues → docs if doc impact → save → commit
 - [ ] Phase 4: Client apply and inbound lifecycle — build → review → iterate if in-plan issues → docs if doc impact → save → commit
 - [ ] Phase 5: End-to-end verification and docs — build → review → iterate if in-plan issues → docs if doc impact → save → commit

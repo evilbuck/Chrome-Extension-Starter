@@ -260,5 +260,17 @@
     "message": "These workspaces are available for the client to request. Start the transfer from the client."
   },
   "slackStart": { "message": "Start Slack transfer" },
-  "slackOpenDestination": { "message": "Open transferred Slack tab" }
+  "slackOpenDestination": { "message": "Open transferred Slack tab" },
+  "resourceSectionLabel": { "message": "Site resources" },
+  "resourceTitle": { "message": "Copy site resources" },
+  "resourceWarning": {
+    "message": "Checked items — including credentials — are copied live to the paired client. This extension does not decide what matters."
+  },
+  "resourceSiteLabel": { "message": "Open site" },
+  "resourceChooseSite": { "message": "Choose an open site" },
+  "resourceCookiesTitle": { "message": "Cookies" },
+  "resourceStorageTitle": { "message": "localStorage" },
+  "resourceStorageUnreadable": { "message": "localStorage is unreadable from this site tab." },
+  "resourcePermissionDenied": { "message": "Site access was not granted." },
+  "resourceLoadFailed": { "message": "Site resources could not be loaded." }
 }

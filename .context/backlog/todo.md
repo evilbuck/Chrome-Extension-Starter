@@ -9,11 +9,9 @@ status: active
 
 New options-page feature, independent of the LAN login phase queue. Plan phased 2026-09-22; execution queue below.
 
-- [ ] [Resources Phase 2: Host site picker and resource panel](items/phase-2-resource-site-panel.md)
-
 ## Upcoming resource sync phases
 
-Sequential after Resources Phase 2; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
+Phase 3 is next; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
 
 - [ ] [Resources Phase 3: Subscriptions and live watches](items/phase-3-resource-live-watches.md)
 - [ ] [Resources Phase 4: Client apply and inbound lifecycle](items/phase-4-resource-client-apply.md)

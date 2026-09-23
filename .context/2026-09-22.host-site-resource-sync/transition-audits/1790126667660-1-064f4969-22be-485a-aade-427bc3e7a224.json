@@ -1,0 +1,22 @@
+{
+  "legal": [
+    {
+      "kind": "retry"
+    },
+    {
+      "kind": "advance"
+    },
+    {
+      "kind": "block"
+    }
+  ],
+  "raw": "```json\n{ \"choice\": \"block\", \"reason\": \"Postcondition is ambiguous while docsImpact and howtoImpact are both true. Cannot advance with unverified completion — the documentation and howto impact requires explicit resolution before the phase can be marked done. Retrying the scan without addressing the underlying ambiguity risks the same indeterminate result; blocking surfaces the gap so the doc updates can be performed and the postcondition re-checked to a definitive pass.\" }\n```",
+  "parsed": {
+    "choice": "block",
+    "reason": "Postcondition is ambiguous while docsImpact and howtoImpact are both true. Cannot advance with unverified completion — the documentation and howto impact requires explicit resolution before the phase can be marked done. Retrying the scan without addressing the underlying ambiguity risks the same indeterminate result; blocking surfaces the gap so the doc updates can be performed and the postcondition re-checked to a definitive pass."
+  },
+  "accepted": true,
+  "reason": "Postcondition is ambiguous while docsImpact and howtoImpact are both true. Cannot advance with unverified completion — the documentation and howto impact requires explicit resolution before the phase can be marked done. Retrying the scan without addressing the underlying ambiguity risks the same indeterminate result; blocking surfaces the gap so the doc updates can be performed and the postcondition re-checked to a definitive pass.",
+  "context": "state=documenting phase=.context/2026-09-22.host-site-resource-sync/phase-2-resource-site-panel.md why=postcondition scan ambiguous parseable=true docsImpact=true howtoImpact=true postcondition=ambiguous",
+  "attempt": 1
+}

@@ -325,7 +325,9 @@ export const MESSAGE_SPEC = {
     },
     [MSG.RESOURCE_LIST_ITEMS]: {
         req: {} as { origin: string },
-        res: {} as { ok: true; cookies: unknown[]; localStorageKeys: unknown[] } | { ok: false; error: string }
+        res: {} as
+            | { ok: true; cookies: unknown[]; localStorage: { readable: boolean; items: unknown[] } }
+            | { ok: false; error: string }
     },
     [MSG.RESOURCE_SUBSCRIBE]: {
         req: {} as { origin: string; id: string },

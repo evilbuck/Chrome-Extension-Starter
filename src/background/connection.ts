@@ -24,6 +24,7 @@
 // Each command has a runtime payload validator. The worker forwards pairing
 // commands to the offscreen by tagging them with `target: OFFSCREEN_TARGET`.
 
+import { enableResourceOrigin, listResourceItems, listResourceSites } from '@/background/apps/resources';
 import {
     applySlackSession,
     captureSlackSession,
@@ -55,6 +56,8 @@ import {
     type PayloadKind,
     REQUEST_STATE,
     REQUEST_TRANSPORT_TIMEOUT_MS,
+    RESOURCE_ERROR,
+    type ResourceError,
     ROLE,
     type Role
 } from '@/shared/constants';
@@ -517,6 +520,41 @@ const requireConnected = async (
     return { ok: true, connectionId: status.connectionId };
 };
 
+const runResourceCommand = async <T>(operation: () => Promise<T>): Promise<T | { ok: false; error: ResourceError }> => {
+    const connected = await requireConnected(ROLE.HOST);
+    if (!connected.ok) {
+        return {
+            ok: false,
+            error: connected.error === 'disconnected' ? RESOURCE_ERROR.DISCONNECTED : RESOURCE_ERROR.FAILED
+        };
+    }
+    return operation();
+};
+
+const RESOURCE_UI_COMMANDS: Record<string, true> = {
+    [MSG.RESOURCE_LIST_SITES]: true,
+    [MSG.RESOURCE_ENABLE]: true,
+    [MSG.RESOURCE_LIST_ITEMS]: true
+};
+
+const handleResourceUiCommand = async (
+    type: string,
+    payload: Record<string, unknown>,
+    fromOptions: boolean
+): Promise<unknown> => {
+    if (!fromOptions) return { ok: false, error: ERROR_KIND.INVALID_SENDER_CONTEXT };
+    switch (type) {
+        case MSG.RESOURCE_LIST_SITES:
+            return runResourceCommand(listResourceSites);
+        case MSG.RESOURCE_ENABLE:
+            return runResourceCommand(() => enableResourceOrigin(payload.origin));
+        case MSG.RESOURCE_LIST_ITEMS:
+            return runResourceCommand(() => listResourceItems(payload.origin));
+        default:
+            return { ok: false, error: ERROR_KIND.UNKNOWN_REQUEST };
+    }
+};
+
 const throwTransportError = (error: string): never => {
     if (error === ERROR_KIND.CHANNEL_CLOSED || error === ERROR_KIND.TIMEOUT || error === ERROR_KIND.ICE_FAILED) {
         throw new SlackError('disconnected');
@@ -780,13 +818,15 @@ const handleOffscreenEvent = (payload: OffscreenEventPayload): void => {
 // Inbound message router
 // ---------------------------------------------------------------------------
 
+const asRuntimeMessage = (value: unknown): { type: string; payload?: unknown } | null => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const message = value as { type?: unknown; payload?: unknown };
+    return typeof message.type === 'string' ? { type: message.type, payload: message.payload } : null;
+};
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) {
-        sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
-        return false;
-    }
-    const obj = msg as { type?: unknown; payload?: unknown };
-    if (typeof obj.type !== 'string') {
+    const obj = asRuntimeMessage(msg);
+    if (!obj) {
         sendResponse({ ok: false, error: ERROR_KIND.MALFORMED });
         return false;
     }
@@ -840,6 +880,11 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
             ? (obj.payload as Record<string, unknown>)
             : {};
+
+    if (RESOURCE_UI_COMMANDS[obj.type] === true) {
+        handleResourceUiCommand(obj.type, payload, sender.url === OPTIONS_URL).then(sendResponse);
+        return true;
+    }
 
     switch (obj.type) {
         case MSG.OPTIONS_GET_STATUS: {

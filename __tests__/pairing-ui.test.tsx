@@ -466,6 +466,28 @@ describe('pairingLocksRole', () => {
 });
 
 describe('status updates', () => {
+    it('mounts the resource picker only for an authorized host', async () => {
+        currentStatus = {
+            ok: true,
+            state: 'connected',
+            role: 'host',
+            connectionId: pair.id,
+            authorized: false,
+            error: null,
+            pairing: { ...idlePairing(), phase: 'connected' }
+        };
+        await loadOptions();
+        expect(screen.queryByTestId('resource-site-panel')).toBeNull();
+
+        currentStatus = { ...currentStatus, authorized: true };
+        emitOffscreenEvent();
+        await waitFor(() => expect(screen.queryByTestId('resource-site-panel')).not.toBeNull());
+
+        currentStatus = { ...currentStatus, role: 'client' };
+        emitOffscreenEvent();
+        await waitFor(() => expect(screen.queryByTestId('resource-site-panel')).toBeNull());
+    });
+
     it('refreshes from OPTIONS_GET_STATUS when OFFSCREEN_EVENT fires', async () => {
         await loadOptions();
         await waitFor(() => expect(screen.getByTestId('transport-state').textContent).toBe(PHASE_COPY.idle));

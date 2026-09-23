@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 phase: 2
 order: 2
 plan: plan-host-site-resource-sync.md
@@ -21,15 +21,15 @@ from_plan_steps: [2]
 depends_on: [1]
 dependency_type: HARD
 acceptance_criteria:
-  - "[ ] Panel is mounted on the options page only when this profile is host and the pair is authorized; client role sees no picker."
-  - "[ ] Site list shows unique http(s) origins derived from open host tabs (one row per origin, not per tab); incognito and `RESTRICTED` schemes are skipped."
-  - "[ ] Selecting a site runs `chrome.permissions.request` in the options page (user gesture), then sends `RESOURCE_ENABLE` + `RESOURCE_LIST_ITEMS`; on denial the panel lists nothing and the worker returns `permission_denied` without throwing."
-  - "[ ] Panel lists every cookie `chrome.cookies.getAll` returns for that URL (including httpOnly) and every localStorage key readable from a same-origin host tab, with name/domain/path/flags/size metadata — unclassified, no values rendered."
-  - "[ ] Warning copy present in `en` (ja/zh_TW keys exist; English text acceptable until translated): checked items — including credentials — are copied live to the paired client; the extension does not decide what matters."
-  - "[ ] `src/background/apps/resources.ts` handles `RESOURCE_LIST_SITES` / `RESOURCE_ENABLE` / `RESOURCE_LIST_ITEMS` behind the existing `isAllowedUiPage` sender gate; the Slack pipeline is untouched."
-  - "[ ] Tests pass for the site filter and the permission-denied path (synthetic values only)."
-completed_at: null
-completed_by: null
+  - "[x] Panel is mounted on the options page only when this profile is host and the pair is authorized; client role sees no picker."
+  - "[x] Site list shows unique http(s) origins derived from open host tabs (one row per origin, not per tab); incognito and `RESTRICTED` schemes are skipped."
+  - "[x] Selecting a site runs `chrome.permissions.request` in the options page (user gesture), then sends `RESOURCE_ENABLE` + `RESOURCE_LIST_ITEMS`; on denial the panel lists nothing and the worker returns `permission_denied` without throwing."
+  - "[x] Panel lists every cookie `chrome.cookies.getAll` returns for that URL (including httpOnly) and every localStorage key readable from a same-origin host tab, with name/domain/path/flags/size metadata — unclassified, no values rendered."
+  - "[x] Warning copy present in `en` (ja/zh_TW keys exist; English text acceptable until translated): checked items — including credentials — are copied live to the paired client; the extension does not decide what matters."
+  - "[x] `src/background/apps/resources.ts` handles `RESOURCE_LIST_SITES` / `RESOURCE_ENABLE` / `RESOURCE_LIST_ITEMS` behind the existing `isAllowedUiPage` sender gate; the Slack pipeline is untouched."
+  - "[x] Tests pass for the site filter and the permission-denied path (synthetic values only)."
+completed_at: 2026-09-22
+completed_by: openai-codex/gpt-5.6-sol
 ---
 
 # Phase 2: Host site picker and resource panel

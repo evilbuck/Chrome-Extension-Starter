@@ -1,3 +1,7 @@
+- 2026-09-22 — [buck-loop unblock: Phase 2 false docs block](buck-loop-unblock-2026-09-22.md) — `completed`
+
+  - 2026-09-22 | `buck-loop-unblock-2026-09-22.md` | domains: [buck-loop, resource-sync] | topics: [buck-loop, false-block, phase-2, documentation-impact] | status: completed
+
 - 2026-09-22 — [Host site resource sync Phase 1: wire contract and optional host permissions](host-site-resource-sync-phase-1-2026-09-22.md) — `completed`
 
   - 2026-09-22 | `host-site-resource-sync-phase-1-2026-09-22.md` | domains: [chrome-extension, wire-contract, testing] | topics: [resource-sync, envelope, optional-host-permissions, offscreen, resource-upsert] | status: completed
@@ -15,6 +19,8 @@ status: active
 ---
 
 # Session memory index
+
+- [2026-09-22 — Host site resource sync Phase 2](host-site-resource-sync-phase-2-2026-09-22.md): authorized-host site picker, user-gesture per-origin permission, metadata-only cookie/localStorage lists, unreadable-storage state, options-only worker routing, and partition-aware cookie identity/display. Browser smoke and durable guardrails pass; review iteration adds a 436-test light-gate pass. Next: re-review, then Phase 3. [Phase](../2026-09-22.host-site-resource-sync/phase-2-resource-site-panel.md).
 
 - [2026-09-22 — Host site resource sync Phase 1](host-site-resource-sync-phase-1-2026-09-22.md): optional `*://*/*` host permissions, identities, `resource_upsert`/`applied`/`error` with 48 KiB/96 KiB caps, authorized offscreen forward. Guardrails pass. Review warning: host send does not re-parse item. Next: Phase 2. [Phase](../2026-09-22.host-site-resource-sync/phase-1-resource-wire-contract.md).
 

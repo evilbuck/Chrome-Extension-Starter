@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import { Button } from '@/components/tailgrids/core/button';
 import { PairingPanel, pairingLocksRole, useTransportStatus } from '@/pages/pairing/pairing-panel';
+import { ResourceSitePanel } from '@/pages/resources/site-panel';
 import { SlackRequestPanel } from '@/pages/slack/request-panel';
 import { t } from '@/shared/lib/i18n';
 import '@/shared/styles.css';
@@ -54,6 +55,8 @@ const RoleConfigCard = ({ transport }: { transport: ReturnType<typeof useTranspo
 
 const Options = () => {
     const transport = useTransportStatus();
+    const role = transport.status.pairing.pair?.role ?? transport.localRole ?? transport.status.role;
+    const showResources = role === 'host' && transport.status.authorized === true;
     return (
         <main className="mx-auto max-w-4xl space-y-6 py-4 sm:py-8">
             <header className="mb-8 border-b border-gray-200 pb-6">
@@ -65,6 +68,7 @@ const Options = () => {
             </header>
             <RoleConfigCard transport={transport} />
             <PairingPanel transport={transport} />
+            {showResources && <ResourceSitePanel />}
             <SlackRequestPanel />
         </main>
     );
