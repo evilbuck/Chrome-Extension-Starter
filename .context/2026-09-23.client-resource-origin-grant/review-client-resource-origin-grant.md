@@ -29,4 +29,4 @@ The Grant click is a new user action. Phase 5's how-to must mention it. That doe
 
 ## Closeout
 
-`close-verified` refuses an unphased plan (`unphased plan remains open`). The plan `status` is `completed`. The subject stays active under that script rule. Do not edit lifecycle fields by hand.
+`phase-1-client-origin-grant.md` owns `plan-client-resource-origin-grant.md` and is `status: completed`. `close-verified` is rerun against that phase. Lifecycle fields are not edited by hand.
