@@ -18,15 +18,17 @@ Worst finding: none remaining.
 
 The smoke recorded in `verification-phase-5-results.md` shows a fresh pair, host listing of `teleport_smoke` and `teleport_smoke_key`, client values `host_v1`, live update to `host_v2`, uncheck leaving the client at `host_v2` after the host moved to `host_v3`, recheck restoring sync, host-tab close pausing localStorage while the still-subscribed cookie received `host_v4`, and reopen resuming localStorage through `host_v3` then `host_v4`.
 
-The first granted reconnect opened two inactive `https://example.com` tabs for one localStorage subscription. `openDocument` now installs one in-flight promise per origin before `tabs.create`. Regression: `shares one in-flight tab open when two same-origin applies race`.
+The first granted reconnect opened two inactive `https://example.com` tabs for one localStorage subscription. `openDocument` keeps one per-origin promise through document readiness for a tracked tab, an existing tab, or a newly created tab. It records `opened` only for a tab this feature creates. A loading non-origin URL is not rejected; a mismatched URL is rejected only once the tab is `complete`.
+
+The race regression waits for the fourth `aborted` call, which is inside `applyStorage` immediately before `openDocument`, then asserts one `tabs.create`, then emits completion. An earlier full guardrails run reported that the first apply returned `resource_error`. The `error` field was not in that report, and rerunning the previous microtask-flush test under coverage did not reproduce a failure, so that field is unavailable. The proven problem in that test was the barrier: microtask flushes do not show that the second apply has reached `openDocument`. That does not establish why the first apply returned `resource_error`.
 
 ## Standards axis
 
-Worst finding: none. The share is a synchronous check-and-set around the existing open. It does not skip `permissions.contains`.
+Worst finding: none. Sharing the open does not skip `permissions.contains`.
 
 ## Guardrails
 
-Durable v2 status pass after the fix. Unit gate pass, 471 tests. Lint advisory. Functional skipped. Patch, ratchet, and complexity pass.
+Three consecutive fresh runs of `node skills/b-guardrails-check/scripts/check.mjs --cwd` this repo returned durable status pass. Unit pass. Lint pass. Functional skipped. Patch, ratchet, and complexity pass. Coverage 91.6%.
 
 ## Documentation impact
 
