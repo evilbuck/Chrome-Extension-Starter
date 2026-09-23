@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 date: 2026-09-22
 subject: 2026-09-22.host-site-resource-sync
 topics: [options-page, cookies, localStorage, live-sync, host-client, webrtc]
@@ -156,15 +156,15 @@ UI → worker messages (options.html sender only, same `isAllowedUiPage` gate):
 
 ## Acceptance criteria
 
-- [ ] Host options page, when this profile is host and paired/authorized, lists unique http(s) origins from open host tabs.
-- [ ] Selecting a site prompts for optional cookies/scripting/origin permission; denial lists nothing and does not throw in the worker.
-- [ ] The panel lists all cookies `chrome.cookies.getAll` returns for that URL (including httpOnly) and all page `localStorage` keys from a same-origin host tab, without classifying them.
-- [ ] Checking an item writes it on the paired client; a later host change to that item is written again while checked.
-- [ ] Unchecking stops later pushes and leaves the client copy in place.
-- [ ] Closing the host tab does not uncheck; cookies continue; localStorage shows paused until a same-origin host tab exists, then resumes.
-- [ ] If the client has no tab for that origin, it opens a background tab to apply localStorage and reuses it for later keys on the same origin.
-- [ ] Unpaired, unauthorized, wrong-role, oversize, and missing-permission paths fail closed; cookie/storage values are absent from logs and test fixtures (use synthetic values).
-- [ ] Slack pairing/handoff tests still pass; this feature does not start a Slack request.
+- [x] Host options page, when this profile is host and paired/authorized, lists unique http(s) origins from open host tabs.
+- [x] Selecting a site prompts for optional cookies/scripting/origin permission; denial lists nothing and does not throw in the worker.
+- [x] The panel lists all cookies `chrome.cookies.getAll` returns for that URL (including httpOnly) and all page `localStorage` keys from a same-origin host tab, without classifying them.
+- [x] Checking an item writes it on the paired client; a later host change to that item is written again while checked.
+- [x] Unchecking stops later pushes and leaves the client copy in place.
+- [x] Closing the host tab does not uncheck; cookies continue; localStorage shows paused until a same-origin host tab exists, then resumes.
+- [x] If the client has no tab for that origin, it opens a background tab to apply localStorage and reuses it for later keys on the same origin.
+- [x] Unpaired, unauthorized, wrong-role, oversize, and missing-permission paths fail closed; cookie/storage values are absent from logs and test fixtures (use synthetic values).
+- [x] Slack pairing/handoff tests still pass; this feature does not start a Slack request.
 
 ## Verification
 

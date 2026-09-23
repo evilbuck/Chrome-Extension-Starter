@@ -5,15 +5,6 @@ status: active
 # Active backlog
 
 
-- [ ] [Host options site resource sync](items/host-site-resource-sync.md)
-
-New options-page feature, independent of the LAN login phase queue. Plan phased 2026-09-22; execution queue below.
-
-## Upcoming resource sync phases
-
-The client origin grant is committed. Phase 5 two-profile smoke is next; see the [phases overview](../2026-09-22.host-site-resource-sync/plan-host-site-resource-sync-phases.md).
-
-
 - [ ] [Resource tab-close signal for auto-opened client tabs](items/resource-tab-close-wire-frame.md)
 
 - [ ] [Phase 1: Record experiment boundary](items/phase-1-experiment-boundary.md)

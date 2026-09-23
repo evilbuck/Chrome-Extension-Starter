@@ -1,5 +1,5 @@
 ---
-status: active
+status: completed
 date: 2026-09-22
 subject: 2026-09-22.host-site-resource-sync
 topics: [phasing, options-page, cookies, localStorage, live-sync, host-client, webrtc]
