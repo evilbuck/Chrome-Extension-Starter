@@ -1,5 +1,13 @@
-import { PAYLOAD_KIND, RESOURCE_ERROR, type ResourceError } from '@/shared/constants';
-import type { ResourceCookieItem, ResourceUpsertPayload } from '@/shared/lib/envelope';
+import {
+    PAYLOAD_KIND,
+    PAYLOAD_RESPONSE_KIND,
+    RESOURCE_ERROR,
+    RESOURCE_ITEM_MAX_BYTES,
+    type ResourceError,
+    ROLE,
+    type Role
+} from '@/shared/constants';
+import type { ResourceCookieItem, ResourceLocalStorageItem, ResourceUpsertPayload } from '@/shared/lib/envelope';
 import {
     type CookieIdentity,
     cookieIdentityKey,
@@ -218,11 +226,17 @@ const parseStoredSubscription = (value: unknown): ResourceSubscription | null =>
     return parseSubscription(item.origin, item);
 };
 
+const wireCookieDomain = (cookie: chrome.cookies.Cookie): string => {
+    if (cookie.hostOnly === true) return cookie.domain.replace(/^\./, '');
+    if (cookie.hostOnly === false && !cookie.domain.startsWith('.')) return `.${cookie.domain}`;
+    return cookie.domain;
+};
+
 const cookieItem = (cookie: chrome.cookies.Cookie): ResourceCookieItem => {
     const item: ResourceCookieItem = {
         type: 'cookie',
         name: cookie.name,
-        domain: cookie.domain,
+        domain: wireCookieDomain(cookie),
         path: cookie.path,
         secure: cookie.secure,
         httpOnly: cookie.httpOnly,
@@ -230,7 +244,7 @@ const cookieItem = (cookie: chrome.cookies.Cookie): ResourceCookieItem => {
         session: cookie.session,
         value: cookie.value
     };
-    if (cookie.expirationDate !== undefined) item.expirationDate = cookie.expirationDate;
+    if (!cookie.session && cookie.expirationDate !== undefined) item.expirationDate = cookie.expirationDate;
     if (cookie.partitionKey !== undefined) item.partitionKey = cookie.partitionKey;
     return item;
 };
@@ -572,4 +586,348 @@ export const createResourceSync = (send: ResourceSend, pollIntervalMs = 60_000) 
 
     registerListeners();
     return { start, stop, subscribe, unsubscribe, status, refresh };
+};
+
+const COOKIE_SAME_SITE = ['no_restriction', 'lax', 'strict', 'unspecified'] as const;
+const COOKIE_ITEM_KEYS = [
+    'type',
+    'name',
+    'domain',
+    'path',
+    'secure',
+    'httpOnly',
+    'sameSite',
+    'session',
+    'value',
+    'expirationDate',
+    'partitionKey'
+] as const;
+const STORAGE_ITEM_KEYS = ['type', 'key', 'value'] as const;
+const DOCUMENT_LOAD_MS = 10_000;
+
+const onlyOwnKeys = (obj: Record<string, unknown>, keys: readonly string[]): boolean =>
+    Object.keys(obj).every((key) => keys.includes(key));
+
+const isSameSite = (value: unknown): value is (typeof COOKIE_SAME_SITE)[number] =>
+    typeof value === 'string' && (COOKIE_SAME_SITE as readonly string[]).includes(value);
+
+const partitionFrom = (value: unknown): chrome.cookies.CookiePartitionKey | ResourceError => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return RESOURCE_ERROR.MALFORMED;
+    const fields = value as Record<string, unknown>;
+    if (!onlyOwnKeys(fields, ['topLevelSite', 'hasCrossSiteAncestor'])) return RESOURCE_ERROR.MALFORMED;
+    const partition: chrome.cookies.CookiePartitionKey = {};
+    if (fields.topLevelSite !== undefined) {
+        if (typeof fields.topLevelSite !== 'string') return RESOURCE_ERROR.MALFORMED;
+        partition.topLevelSite = fields.topLevelSite;
+    }
+    if (fields.hasCrossSiteAncestor !== undefined) {
+        if (typeof fields.hasCrossSiteAncestor !== 'boolean') return RESOURCE_ERROR.MALFORMED;
+        partition.hasCrossSiteAncestor = fields.hasCrossSiteAncestor;
+    }
+    return partition;
+};
+
+const cookieFlags = (
+    obj: Record<string, unknown>
+): { secure: boolean; httpOnly: boolean; session: boolean } | ResourceError => {
+    const { secure, httpOnly, session } = obj;
+    if (typeof secure !== 'boolean' || typeof httpOnly !== 'boolean' || typeof session !== 'boolean') {
+        return RESOURCE_ERROR.MALFORMED;
+    }
+    return { secure, httpOnly, session };
+};
+
+const withExpiration = (item: ResourceCookieItem, raw: unknown): ResourceError | null => {
+    if (item.session || raw === undefined) return null;
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) return RESOURCE_ERROR.MALFORMED;
+    item.expirationDate = raw;
+    return null;
+};
+
+const withPartition = (item: ResourceCookieItem, raw: unknown): ResourceError | null => {
+    if (raw === undefined) return null;
+    const partitionKey = partitionFrom(raw);
+    if (typeof partitionKey === 'string') return partitionKey;
+    item.partitionKey = partitionKey;
+    return null;
+};
+
+const cookieApplyFields = (
+    obj: Record<string, unknown>
+):
+    | {
+          name: string;
+          domain: string;
+          path: string;
+          value: string;
+          sameSite: (typeof COOKIE_SAME_SITE)[number];
+      }
+    | ResourceError => {
+    if (typeof obj.name !== 'string' || typeof obj.domain !== 'string') return RESOURCE_ERROR.MALFORMED;
+    if (typeof obj.path !== 'string' || !obj.path.startsWith('/')) return RESOURCE_ERROR.MALFORMED;
+    if (typeof obj.value !== 'string' || !isSameSite(obj.sameSite)) return RESOURCE_ERROR.MALFORMED;
+    return {
+        name: obj.name,
+        domain: obj.domain,
+        path: obj.path,
+        value: obj.value,
+        sameSite: obj.sameSite
+    };
+};
+
+const parseCookieApplyItem = (obj: Record<string, unknown>): ResourceCookieItem | ResourceError => {
+    if (!onlyOwnKeys(obj, COOKIE_ITEM_KEYS)) return RESOURCE_ERROR.MALFORMED;
+    const flags = cookieFlags(obj);
+    if (typeof flags === 'string') return flags;
+    const fields = cookieApplyFields(obj);
+    if (typeof fields === 'string') return fields;
+    const item: ResourceCookieItem = {
+        type: 'cookie',
+        name: fields.name,
+        domain: fields.domain,
+        path: fields.path,
+        secure: flags.secure,
+        httpOnly: flags.httpOnly,
+        sameSite: fields.sameSite,
+        session: flags.session,
+        value: fields.value
+    };
+    const expiration = withExpiration(item, obj.expirationDate);
+    if (expiration) return expiration;
+    const partition = withPartition(item, obj.partitionKey);
+    if (partition) return partition;
+    return item;
+};
+
+const parseStorageApplyItem = (obj: Record<string, unknown>): ResourceLocalStorageItem | ResourceError => {
+    if (!onlyOwnKeys(obj, STORAGE_ITEM_KEYS)) return RESOURCE_ERROR.MALFORMED;
+    if (typeof obj.key !== 'string' || typeof obj.value !== 'string') return RESOURCE_ERROR.MALFORMED;
+    return { type: 'localStorage', key: obj.key, value: obj.value };
+};
+
+const parseApplyItem = (value: unknown): ResourceCookieItem | ResourceLocalStorageItem | ResourceError => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return RESOURCE_ERROR.MALFORMED;
+    const item = value as Record<string, unknown>;
+    if (new TextEncoder().encode(JSON.stringify(item)).byteLength > RESOURCE_ITEM_MAX_BYTES) {
+        return RESOURCE_ERROR.OVERSIZED;
+    }
+    if (item.type === 'cookie') return parseCookieApplyItem(item);
+    if (item.type === 'localStorage') return parseStorageApplyItem(item);
+    return RESOURCE_ERROR.MALFORMED;
+};
+
+const errorReply = (replyTo: string, error: ResourceError) => ({
+    kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR as const,
+    replyTo,
+    error
+});
+
+const appliedReply = (replyTo: string, origin: string, type: 'cookie' | 'localStorage', id: string) => ({
+    kind: PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED as const,
+    replyTo,
+    origin,
+    type,
+    id
+});
+
+const cookieDetails = (origin: string, item: ResourceCookieItem): chrome.cookies.SetDetails => {
+    const details: chrome.cookies.SetDetails = {
+        url: `${origin}${item.path}`,
+        name: item.name,
+        value: item.value,
+        path: item.path,
+        secure: item.secure,
+        httpOnly: item.httpOnly,
+        sameSite: item.sameSite
+    };
+    if (item.domain.startsWith('.')) details.domain = item.domain;
+    if (item.expirationDate !== undefined) details.expirationDate = item.expirationDate;
+    if (item.partitionKey !== undefined) details.partitionKey = item.partitionKey;
+    return details;
+};
+
+const tabOrigin = (url: string | undefined): string | null => {
+    if (!url) return null;
+    try {
+        return new URL(url).origin;
+    } catch {
+        return null;
+    }
+};
+
+const isOriginTab = (tab: chrome.tabs.Tab | undefined, origin: string): tab is chrome.tabs.Tab & { id: number } =>
+    tab?.id !== undefined && tab.incognito !== true && tabOrigin(tab.url) === origin;
+
+// Serialized by executeScript. Keep every dependency inside this function.
+const writeLocalStorageValue = (key: string, value: string): boolean => {
+    try {
+        localStorage.setItem(key, value);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const waitForDocument = (tabId: number, origin: string, timeoutMs: number): Promise<boolean> => {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    let settled = false;
+    const finish = (ready: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+        resolve(ready);
+    };
+    const onUpdated = (id: number, info: { status?: string }, tab: chrome.tabs.Tab) => {
+        if (id !== tabId || info.status !== 'complete') return;
+        finish(isOriginTab(tab, origin));
+    };
+    const timer = setTimeout(() => {
+        void chrome.tabs.get(tabId).then(
+            (tab) => finish(isOriginTab(tab, origin) && tab.status === 'complete'),
+            () => finish(false)
+        );
+    }, timeoutMs);
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    void chrome.tabs.get(tabId).then(
+        (tab) => {
+            if (!isOriginTab(tab, origin)) finish(false);
+            else if (tab.status === 'complete') finish(true);
+        },
+        () => finish(false)
+    );
+    return promise;
+};
+
+const readTrackedTab = async (opened: Map<string, number>, origin: string): Promise<number | null> => {
+    const id = opened.get(origin);
+    if (id === undefined) return null;
+    try {
+        const tab = await chrome.tabs.get(id);
+        if (isOriginTab(tab, origin)) return tab.id;
+    } catch {
+        // The tracked tab is gone. Fall through and open another document.
+    }
+    opened.delete(origin);
+    return null;
+};
+
+const openDocument = async (opened: Map<string, number>, origin: string): Promise<number | null> => {
+    const tracked = await readTrackedTab(opened, origin);
+    if (tracked !== null) return tracked;
+    const existing = sameOriginTab(await chrome.tabs.query({}), origin);
+    if (existing?.id !== undefined) return existing.id;
+    const created = await chrome.tabs.create({ url: `${origin}/`, active: false });
+    if (created.id === undefined) return null;
+    opened.set(origin, created.id);
+    return created.id;
+};
+
+export type ResourceApplyResult =
+    | {
+          kind: typeof PAYLOAD_RESPONSE_KIND.RESOURCE_APPLIED;
+          replyTo: string;
+          origin: string;
+          type: 'cookie' | 'localStorage';
+          id: string;
+      }
+    | {
+          kind: typeof PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR;
+          replyTo: string;
+          error: ResourceError;
+      };
+
+const applyCookie = async (replyTo: string, origin: string, item: ResourceCookieItem): Promise<ResourceApplyResult> => {
+    try {
+        const installed = await chrome.cookies.set(cookieDetails(origin, item));
+        if (!installed) return errorReply(replyTo, RESOURCE_ERROR.PERMISSION_DENIED);
+    } catch {
+        return errorReply(replyTo, RESOURCE_ERROR.FAILED);
+    }
+    return appliedReply(replyTo, origin, 'cookie', item.name);
+};
+
+const applyStorage = async (
+    replyTo: string,
+    origin: string,
+    item: ResourceLocalStorageItem,
+    opened: Map<string, number>,
+    held: Map<string, Set<string>>,
+    timeoutMs: number
+): Promise<ResourceApplyResult> => {
+    let tabId: number | null;
+    try {
+        tabId = await openDocument(opened, origin);
+    } catch {
+        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
+    }
+    if (tabId === null || !(await waitForDocument(tabId, origin, timeoutMs))) {
+        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
+    }
+    try {
+        const result = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: writeLocalStorageValue,
+            args: [item.key, item.value]
+        });
+        if (result[0]?.result !== true) return errorReply(replyTo, RESOURCE_ERROR.FAILED);
+    } catch {
+        return errorReply(replyTo, RESOURCE_ERROR.NO_DOCUMENT);
+    }
+    const keys = held.get(origin) ?? new Set<string>();
+    keys.add(item.key);
+    held.set(origin, keys);
+    return appliedReply(replyTo, origin, 'localStorage', item.key);
+};
+
+export type ResourceApplyRequest = {
+    role: Role;
+    authorized: boolean;
+    replyTo: string;
+    origin: unknown;
+    item: unknown;
+};
+
+export const createResourceClient = (loadTimeoutMs = DOCUMENT_LOAD_MS) => {
+    const opened = new Map<string, number>();
+    const held = new Map<string, Set<string>>();
+    const forgetOpened = (tabId: number): void => {
+        for (const [origin, id] of opened) {
+            if (id === tabId) opened.delete(origin);
+        }
+    };
+    chrome.tabs?.onRemoved?.addListener(forgetOpened);
+
+    const apply = async (request: ResourceApplyRequest) => {
+        const replyTo = typeof request.replyTo === 'string' ? request.replyTo : '';
+        if (request.role !== ROLE.CLIENT || request.authorized !== true) {
+            return errorReply(
+                replyTo,
+                request.authorized === true ? RESOURCE_ERROR.FAILED : RESOURCE_ERROR.DISCONNECTED
+            );
+        }
+        const origin = canonicalOrigin(request.origin);
+        if (!origin) return errorReply(replyTo, RESOURCE_ERROR.MALFORMED);
+        const item = parseApplyItem(request.item);
+        if (typeof item === 'string') return errorReply(replyTo, item);
+        if (!(await hasPermission(origin))) return errorReply(replyTo, RESOURCE_ERROR.PERMISSION_DENIED);
+        if (item.type === 'cookie') return applyCookie(replyTo, origin, item);
+        return applyStorage(replyTo, origin, item, opened, held, loadTimeoutMs);
+    };
+
+    const releaseLocalStorage = async (origin: string, key: string): Promise<void> => {
+        const keys = held.get(origin);
+        if (!keys?.delete(key) || keys.size > 0) return;
+        held.delete(origin);
+        const tabId = opened.get(origin);
+        opened.delete(origin);
+        if (tabId === undefined) return;
+        try {
+            await chrome.tabs.remove(tabId);
+        } catch {
+            // Already closed, or it was never a tab this feature may close.
+        }
+    };
+
+    return { apply, releaseLocalStorage };
 };

@@ -687,6 +687,117 @@ describe('worker command routing', () => {
         ).toEqual({ ok: false, error: 'permission_denied' });
     });
 
+    it('does not apply an inbound resource upsert on the host or an unauthorized client', async () => {
+        const set = vi.fn();
+        Object.assign(chrome.cookies, { set });
+        const requestId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+        const inbound = (authorized: boolean, role: 'host' | 'client', connection = connectionId) => {
+            offscreenReply = (message) => {
+                if (message.type === MSG.OFFSCREEN_STATUS) return connectedStatus(authorized, role);
+                return { ok: false, error: 'disconnected' };
+            };
+            return deliver(
+                background,
+                {
+                    type: MSG.OFFSCREEN_APP_INBOUND,
+                    payload: {
+                        kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                        origin: 'https://example.com',
+                        item: {
+                            type: 'cookie',
+                            name: 'syn-cookie',
+                            domain: '.example.com',
+                            path: '/',
+                            secure: true,
+                            httpOnly: true,
+                            sameSite: 'lax',
+                            session: true,
+                            value: 'synthetic-cookie-value'
+                        },
+                        requestId,
+                        connectionId: connection,
+                        deadline: Date.now() + 1000
+                    }
+                },
+                offscreenSender
+            );
+        };
+
+        await expect(inbound(true, 'host')).resolves.toEqual({
+            kind: 'resource_error',
+            replyTo: requestId,
+            error: 'failed'
+        });
+        await expect(inbound(false, 'client')).resolves.toEqual({
+            kind: 'resource_error',
+            replyTo: requestId,
+            error: 'disconnected'
+        });
+        await expect(inbound(true, 'client', 'cccccccc-dddd-4eee-8fff-000000000000')).resolves.toEqual({
+            kind: 'resource_error',
+            replyTo: requestId,
+            error: 'disconnected'
+        });
+        expect(set).not.toHaveBeenCalled();
+    });
+
+    it('applies an inbound cookie upsert only for an authorized client', async () => {
+        (chrome.permissions.contains as Mock).mockResolvedValue(true);
+        const set = vi.fn(async () => ({ name: 'syn-cookie' }));
+        Object.assign(chrome.cookies, { set });
+        const requestId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+        offscreenReply = (message) => {
+            if (message.type === MSG.OFFSCREEN_STATUS) return connectedStatus(true, 'client');
+            return { ok: false, error: 'disconnected' };
+        };
+
+        await expect(
+            deliver(
+                background,
+                {
+                    type: MSG.OFFSCREEN_APP_INBOUND,
+                    payload: {
+                        kind: PAYLOAD_KIND.RESOURCE_UPSERT,
+                        origin: 'https://example.com',
+                        item: {
+                            type: 'cookie',
+                            name: 'syn-cookie',
+                            domain: '.example.com',
+                            path: '/',
+                            secure: true,
+                            httpOnly: true,
+                            sameSite: 'lax',
+                            session: true,
+                            value: 'synthetic-cookie-value'
+                        },
+                        requestId,
+                        connectionId,
+                        deadline: Date.now() + 1000
+                    }
+                },
+                offscreenSender
+            )
+        ).resolves.toEqual({
+            kind: 'resource_applied',
+            replyTo: requestId,
+            origin: 'https://example.com',
+            type: 'cookie',
+            id: 'syn-cookie'
+        });
+        expect(set).toHaveBeenCalledWith(
+            expect.objectContaining({
+                url: 'https://example.com/',
+                domain: '.example.com',
+                name: 'syn-cookie',
+                value: 'synthetic-cookie-value',
+                path: '/',
+                secure: true,
+                httpOnly: true,
+                sameSite: 'lax'
+            })
+        );
+    });
+
     it('rejects SLACK_LIST without sharing approval', async () => {
         expect(await deliver(background, { type: MSG.SLACK_LIST }, optionsSender)).toEqual({
             ok: false,

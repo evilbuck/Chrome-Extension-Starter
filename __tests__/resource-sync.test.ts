@@ -2,6 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { h } from 'preact';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import {
+    createResourceClient,
     createResourceSync,
     enableResourceOrigin,
     listResourceItems,
@@ -623,6 +624,282 @@ describe('resource subscriptions and live watches', () => {
         expect(api.storage.local.set).not.toHaveBeenCalled();
         expect(sent).not.toHaveBeenCalled();
         sync.stop();
+    });
+});
+
+describe('client resource apply', () => {
+    const replyTo = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+
+    const clientChrome = () => {
+        const api = makeChrome();
+        const created = new Map<number, { id: number; url: string; incognito: boolean; status: string }>();
+        return {
+            ...api,
+            cookies: {
+                ...api.cookies,
+                set: vi.fn(async (details: chrome.cookies.SetDetails) => details)
+            },
+            tabs: {
+                ...api.tabs,
+                get: vi.fn(async (id: number) => {
+                    const found = api.__tabs.find((tab) => tab.id === id) ?? created.get(id);
+                    if (!found) throw new Error('missing tab');
+                    return found;
+                }),
+                create: vi.fn(async ({ url }: { url: string }) => {
+                    const tab = { id: 90 + created.size, url, incognito: false, status: 'complete' };
+                    created.set(tab.id, tab);
+                    return tab;
+                }),
+                remove: vi.fn(async () => undefined)
+            }
+        };
+    };
+
+    const request = (role: 'host' | 'client', item: unknown, authorized = true) => ({
+        role,
+        authorized,
+        replyTo,
+        origin: 'https://example.com',
+        item
+    });
+
+    it('writes a domain cookie with partition and expiry, and a host-only session cookie without domain', async () => {
+        const api = clientChrome();
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient();
+
+        await expect(
+            client.apply(
+                request('client', {
+                    type: 'cookie',
+                    name: 'syn-cookie',
+                    domain: '.example.com',
+                    path: '/account',
+                    secure: true,
+                    httpOnly: true,
+                    sameSite: 'lax',
+                    session: false,
+                    expirationDate: 2_000_000_000,
+                    partitionKey: { topLevelSite: 'https://example.com', hasCrossSiteAncestor: false },
+                    value: 'synthetic-cookie-value'
+                })
+            )
+        ).resolves.toEqual({
+            kind: 'resource_applied',
+            replyTo,
+            origin: 'https://example.com',
+            type: 'cookie',
+            id: 'syn-cookie'
+        });
+        expect(api.cookies.set).toHaveBeenCalledWith({
+            url: 'https://example.com/account',
+            domain: '.example.com',
+            name: 'syn-cookie',
+            value: 'synthetic-cookie-value',
+            path: '/account',
+            secure: true,
+            httpOnly: true,
+            sameSite: 'lax',
+            expirationDate: 2_000_000_000,
+            partitionKey: { topLevelSite: 'https://example.com', hasCrossSiteAncestor: false }
+        });
+
+        await client.apply(
+            request('client', {
+                type: 'cookie',
+                name: 'syn-host',
+                domain: 'example.com',
+                path: '/',
+                secure: true,
+                httpOnly: true,
+                sameSite: 'strict',
+                session: true,
+                expirationDate: 2_000_000_000,
+                partitionKey: { topLevelSite: 'https://example.com' },
+                value: 'synthetic-host-value'
+            })
+        );
+        expect(api.cookies.set).toHaveBeenLastCalledWith({
+            url: 'https://example.com/',
+            name: 'syn-host',
+            value: 'synthetic-host-value',
+            path: '/',
+            secure: true,
+            httpOnly: true,
+            sameSite: 'strict',
+            partitionKey: { topLevelSite: 'https://example.com' }
+        });
+    });
+
+    it('does not write when the role is host, the peer is unauthorized, or the item is malformed', async () => {
+        const api = clientChrome();
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient();
+        const item = {
+            type: 'cookie',
+            name: 'syn-cookie',
+            domain: '.example.com',
+            path: '/',
+            secure: true,
+            httpOnly: true,
+            sameSite: 'lax',
+            session: true,
+            value: 'synthetic-cookie-value'
+        };
+
+        await expect(client.apply(request('host', item))).resolves.toEqual({
+            kind: 'resource_error',
+            replyTo,
+            error: 'failed'
+        });
+        await expect(client.apply(request('client', item, false))).resolves.toEqual({
+            kind: 'resource_error',
+            replyTo,
+            error: 'disconnected'
+        });
+        await expect(client.apply(request('client', { ...item, extra: true }))).resolves.toMatchObject({
+            kind: 'resource_error',
+            error: 'malformed'
+        });
+        expect(api.cookies.set).not.toHaveBeenCalled();
+        expect(api.tabs.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an oversize item before opening a tab or writing a cookie', async () => {
+        const api = clientChrome();
+        api.tabs.query.mockResolvedValue([]);
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient();
+        const value = 'x'.repeat(49 * 1024);
+
+        await expect(
+            client.apply(
+                request('client', {
+                    type: 'cookie',
+                    name: 'syn-cookie',
+                    domain: '.example.com',
+                    path: '/',
+                    secure: true,
+                    httpOnly: true,
+                    sameSite: 'lax',
+                    session: true,
+                    value
+                })
+            )
+        ).resolves.toMatchObject({ kind: 'resource_error', error: 'oversized' });
+        await expect(
+            client.apply(request('client', { type: 'localStorage', key: 'syn-key', value }))
+        ).resolves.toMatchObject({ kind: 'resource_error', error: 'oversized' });
+
+        expect(api.cookies.set).not.toHaveBeenCalled();
+        expect(api.tabs.create).not.toHaveBeenCalled();
+        expect(api.scripting.executeScript).not.toHaveBeenCalled();
+    });
+
+    it('opens one background tab per origin, reuses it, and closes only that tab when the last key is released', async () => {
+        const api = clientChrome();
+        api.tabs.query.mockResolvedValue([]);
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient();
+        const item = (key: string) => ({ type: 'localStorage', key, value: 'synthetic-storage-value' });
+
+        await expect(client.apply(request('client', item('syn-a')))).resolves.toEqual({
+            kind: 'resource_applied',
+            replyTo,
+            origin: 'https://example.com',
+            type: 'localStorage',
+            id: 'syn-a'
+        });
+        await expect(client.apply(request('client', item('syn-b')))).resolves.toMatchObject({
+            kind: 'resource_applied',
+            id: 'syn-b'
+        });
+
+        expect(api.tabs.create).toHaveBeenCalledTimes(1);
+        expect(api.tabs.create).toHaveBeenCalledWith({ url: 'https://example.com/', active: false });
+        expect(api.scripting.executeScript).toHaveBeenCalledTimes(2);
+
+        await client.releaseLocalStorage('https://example.com', 'syn-a');
+        expect(api.tabs.remove).not.toHaveBeenCalled();
+        await client.releaseLocalStorage('https://example.com', 'syn-b');
+        expect(api.tabs.remove).toHaveBeenCalledTimes(1);
+        expect(api.tabs.remove).toHaveBeenCalledWith(90);
+    });
+
+    it('reuses a user tab and never closes it when the last localStorage key is released', async () => {
+        const api = clientChrome();
+        api.__tabs[0] = { ...api.__tabs[0], status: 'complete' };
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient();
+
+        await expect(
+            client.apply(request('client', { type: 'localStorage', key: 'syn-key', value: 'synthetic-storage-value' }))
+        ).resolves.toMatchObject({ kind: 'resource_applied', id: 'syn-key' });
+
+        expect(api.tabs.create).not.toHaveBeenCalled();
+        expect(api.scripting.executeScript).toHaveBeenCalledWith(
+            expect.objectContaining({ target: { tabId: 1 }, args: ['syn-key', 'synthetic-storage-value'] })
+        );
+        await client.releaseLocalStorage('https://example.com', 'syn-key');
+        expect(api.tabs.remove).not.toHaveBeenCalled();
+    });
+
+    it('returns no_document and does not write when the opened tab never finishes loading', async () => {
+        const api = clientChrome();
+        const loading = { id: 44, url: 'https://example.com/', incognito: false, status: 'loading' };
+        api.tabs.query.mockResolvedValue([]);
+        api.tabs.create.mockResolvedValue(loading);
+        api.tabs.get.mockResolvedValue(loading);
+        vi.stubGlobal('chrome', api);
+        const client = createResourceClient(20);
+
+        await expect(
+            client.apply(request('client', { type: 'localStorage', key: 'syn-key', value: 'synthetic-storage-value' }))
+        ).resolves.toEqual({
+            kind: 'resource_error',
+            replyTo,
+            error: 'no_document'
+        });
+        expect(api.scripting.executeScript).not.toHaveBeenCalled();
+    });
+
+    it('sends host-only cookies without a leading dot or expiry, and prefixes domain cookies', async () => {
+        const api = makeChrome();
+        api.cookies.getAll.mockResolvedValue([
+            { ...syntheticCookie, domain: 'example.com', hostOnly: true, session: true, partitionKey: undefined }
+        ]);
+        vi.stubGlobal('chrome', api);
+        const sent = vi.fn().mockResolvedValue(null);
+        const sync = createResourceSync(sent, 60_000);
+        await sync.start();
+        await sync.subscribe('https://example.com', {
+            type: 'cookie',
+            name: syntheticCookie.name,
+            domain: 'example.com',
+            path: syntheticCookie.path,
+            storeId: syntheticCookie.storeId
+        });
+
+        expect(sent.mock.calls[0][0].item.domain).toBe('example.com');
+        expect(sent.mock.calls[0][0].item).not.toHaveProperty('expirationDate');
+        sync.stop();
+
+        sent.mockClear();
+        api.cookies.getAll.mockResolvedValue([
+            { ...syntheticCookie, domain: 'example.com', hostOnly: false, partitionKey: undefined }
+        ]);
+        const domainSync = createResourceSync(sent, 60_000);
+        await domainSync.start();
+        await domainSync.subscribe('https://example.com', {
+            type: 'cookie',
+            name: syntheticCookie.name,
+            domain: 'example.com',
+            path: syntheticCookie.path,
+            storeId: syntheticCookie.storeId
+        });
+        expect(sent.mock.calls[0][0].item.domain).toBe('.example.com');
+        domainSync.stop();
     });
 });
 

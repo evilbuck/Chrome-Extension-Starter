@@ -6,7 +6,7 @@ topics: [phasing, options-page, cookies, localStorage, live-sync, host-client, w
 source_plan: plan-host-site-resource-sync.md
 phases: 5
 format: discrete
-memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md, host-site-resource-sync-phase-3-2026-09-22.md, host-site-resource-sync-iterate-2026-09-22.md]
+memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-phase-2-2026-09-22.md, host-site-resource-sync-phase-3-2026-09-22.md, host-site-resource-sync-iterate-2026-09-22.md, host-site-resource-sync-phase-4-2026-09-23.md]
 ---
 
 # Phased Plan: Host options site resource sync
@@ -27,7 +27,7 @@ memory: [host-site-resource-sync-phase-1-2026-09-22.md, host-site-resource-sync-
 | 1: Wire contract and permission foundation | completed | hard | none | [phase-1-resource-wire-contract.md](phase-1-resource-wire-contract.md) |
 | 2: Host site picker and resource panel | completed | medium | none | [phase-2-resource-site-panel.md](phase-2-resource-site-panel.md) |
 | 3: Subscriptions and live watches | completed | medium | none | [phase-3-resource-live-watches.md](phase-3-resource-live-watches.md) |
-| 4: Client apply and inbound lifecycle | pending | hard | none | [phase-4-resource-client-apply.md](phase-4-resource-client-apply.md) |
+| 4: Client apply and inbound lifecycle | completed | hard | none | [phase-4-resource-client-apply.md](phase-4-resource-client-apply.md) |
 | 5: End-to-end verification and docs | pending | easy | none | [phase-5-resource-e2e-docs.md](phase-5-resource-e2e-docs.md) |
 
 ## Dependency Matrix

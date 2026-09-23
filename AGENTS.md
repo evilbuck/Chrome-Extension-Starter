@@ -147,4 +147,5 @@ If a check fails, re-verify before escalating:
 - Optional site access: add origins only to `optional_host_permissions`; never `host_permissions` for `*://*/*`. Permission object is `{ permissions: ['cookies', 'scripting'], origins: [\`${origin}/*\`] }`.
 - Value-free: logs and tests must not include real cookie/storage values; synthetic fixtures only.
 - Cookie identity is `name + domain + path + partitionKey + storeId`; localStorage identity is `origin + key`. Skip non-http(s), `RESTRICTED` schemes, and incognito tabs.
+- Cookie wire domain: a leading `.` is a domain cookie and is passed to `chrome.cookies.set` as `domain`. No leading `.` is host-only — omit `domain` on set. Chrome's `cookie.domain` has no leading dot even for domain cookies; senders must encode via `hostOnly` (`wireCookieDomain`), never forward `cookie.domain` unchanged.
 <!-- END b-docs:conventions -->

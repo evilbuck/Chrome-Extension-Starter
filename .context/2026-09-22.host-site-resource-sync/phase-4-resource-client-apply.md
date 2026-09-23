@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 phase: 4
 order: 4
 plan: plan-host-site-resource-sync.md
@@ -16,15 +16,16 @@ from_plan_steps: [7, 8]
 depends_on: [1]
 dependency_type: HARD
 acceptance_criteria:
-  - "[ ] Inbound `resource_upsert` is applied only on the client role; host role, unpaired, and unauthorized connections fail closed (drop, no write)."
-  - "[ ] Cookies are written via `chrome.cookies.set` preserving name, value, domain (omitted when the source was host-only), path, secure, httpOnly, sameSite, session/expirationDate, and `partitionKey` when present."
-  - "[ ] localStorage writes reuse an existing same-origin client tab; if none, `tabs.create({ url: origin + '/', active: false })`, wait for complete, then `executeScript` `setItem`; auto-opened tab ids are tracked and reused for later keys on the same origin."
-  - "[ ] Only tabs this feature opened may be auto-closed, and only when the last localStorage subscription for that origin goes away — never a user-opened tab."
-  - "[ ] Every applied item acks `resource_applied` (`replyTo`, `origin`, `type`, `id`); failures return `resource_error` with the closed enum (`permission_denied | oversized | no_document | disconnected | malformed | failed`)."
-  - "[ ] An oversize or malformed item rejects with no partial write."
-  - "[ ] Tests pass: client apply with cookie field fidelity (including host-only and partitioned cases), background tab opened once per origin and reused, host-role no-apply, oversize no-partial-write — synthetic values only."
-completed_at: null
-completed_by: null
+  - "[x] Inbound `resource_upsert` is applied only on the client role; host role, unpaired, and unauthorized connections fail closed (drop, no write)."
+  - "[x] Cookies are written via `chrome.cookies.set` preserving name, value, domain (omitted when the source was host-only), path, secure, httpOnly, sameSite, session/expirationDate, and `partitionKey` when present."
+  - "[x] localStorage writes reuse an existing same-origin client tab; if none, `tabs.create({ url: origin + '/', active: false })`, wait for complete, then `executeScript` `setItem`; auto-opened tab ids are tracked and reused for later keys on the same origin."
+  - "[x] Only tabs this feature opened may be auto-closed, and only when the last localStorage subscription for that origin goes away — never a user-opened tab."
+  - "[x] Every applied item acks `resource_applied` (`replyTo`, `origin`, `type`, `id`); failures return `resource_error` with the closed enum (`permission_denied | oversized | no_document | disconnected | malformed | failed`)."
+  - "[x] An oversize or malformed item rejects with no partial write."
+  - "[x] Tests pass: client apply with cookie field fidelity (including host-only and partitioned cases), background tab opened once per origin and reused, host-role no-apply, oversize no-partial-write — synthetic values only."
+completed_at: 2026-09-23
+completed_by: b-build-hard
+memory: [host-site-resource-sync-phase-4-2026-09-23.md]
 ---
 
 # Phase 4: Client apply and inbound lifecycle
@@ -55,7 +56,8 @@ From plan step 7 and the receive-side half of 8:
 
 ## Verification
 
-- Targeted vitest for client apply, tab open-once/reuse, host-role no-apply, oversize no-partial-write passes; Slack suites stay green.
+- Targeted vitest (`resource-sync` + `connection-routing`) passes, including client cookie fidelity, tab open-once/reuse, host-role no-apply, and oversize no-partial-write. Durable guardrails v2 pass: unit 0, lint 0, patch pass, coverage 91.4 ≥ 91.07, complexity pass with no new violations.
+- Host uncheck still sends no frame (Phase 3 contract). The client closes an auto-opened tab only when its own last applied localStorage key for that origin is released. A cross-profile close on host uncheck needs a new wire frame and is not in this phase.
 - Manual smoke of the full loop is Phase 5's gate; here a quick two-profile check (host checks an item → client cookie appears) is a useful early signal.
 
 ## Per-Phase Execution Loop

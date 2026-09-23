@@ -25,6 +25,7 @@
 // commands to the offscreen by tagging them with `target: OFFSCREEN_TARGET`.
 
 import {
+    createResourceClient,
     createResourceSync,
     enableResourceOrigin,
     listResourceItems,
@@ -563,6 +564,7 @@ const resourceSync = createResourceSync(sendResourcePeer);
 void resourceSync.start().catch(() => {
     // A later resource command retries initialization after transient storage/API failure.
 });
+const resourceClient = createResourceClient();
 const runResourceCommand = async <T>(operation: () => Promise<T>): Promise<T | { ok: false; error: ResourceError }> => {
     const connected = await requireConnected(ROLE.HOST);
     if (!connected.ok) {
@@ -788,6 +790,49 @@ const handleRequestStart = async (
     return { ok: true, requestId };
 };
 
+const handleResourceInbound = async (payload: Record<string, unknown>) => {
+    const replyTo = typeof payload.requestId === 'string' ? payload.requestId : '';
+    const status = await handleGetStatus();
+    const connected =
+        status.state === LIFECYCLE.CONNECTED && status.authorized === true && typeof status.connectionId === 'string';
+    if (!connected || payload.connectionId !== status.connectionId) {
+        return {
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+            replyTo,
+            error: RESOURCE_ERROR.DISCONNECTED
+        };
+    }
+    if (status.role !== ROLE.CLIENT) {
+        return {
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+            replyTo,
+            error: RESOURCE_ERROR.FAILED
+        };
+    }
+    if (typeof payload.deadline === 'number' && Date.now() >= payload.deadline) {
+        return {
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+            replyTo,
+            error: RESOURCE_ERROR.DISCONNECTED
+        };
+    }
+    try {
+        return await resourceClient.apply({
+            role: ROLE.CLIENT,
+            authorized: true,
+            replyTo,
+            origin: payload.origin,
+            item: payload.item
+        });
+    } catch {
+        return {
+            kind: PAYLOAD_RESPONSE_KIND.RESOURCE_ERROR,
+            replyTo,
+            error: RESOURCE_ERROR.FAILED
+        };
+    }
+};
+
 const handleAppInbound = async (payload: Record<string, unknown>): Promise<Record<string, unknown>> => {
     const fail = (error: SlackFailure): Record<string, unknown> => ({
         kind: PAYLOAD_RESPONSE_KIND.SLACK_ERROR,
@@ -922,6 +967,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             obj.payload && typeof obj.payload === 'object' && !Array.isArray(obj.payload)
                 ? (obj.payload as Record<string, unknown>)
                 : {};
+        if (inbound.kind === PAYLOAD_KIND.RESOURCE_UPSERT) {
+            handleResourceInbound(inbound).then(sendResponse);
+            return true;
+        }
         handleAppInbound(inbound).then(sendResponse);
         return true;
     }

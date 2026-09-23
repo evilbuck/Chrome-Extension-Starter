@@ -1,3 +1,7 @@
+- 2026-09-23 — [Host site resource sync Phase 4 client apply](host-site-resource-sync-phase-4-2026-09-23.md) — `completed`
+
+  - 2026-09-23 | `host-site-resource-sync-phase-4-2026-09-23.md` | domains: [chrome-extension, resource-sync, testing] | topics: [client-apply, cookies, localStorage, resource-upsert, host-only, background-tabs] | status: completed
+
 - 2026-09-22 — [Host site resource sync Phase 3 pause fix](host-site-resource-sync-iterate-2026-09-22.md) — `completed`
 
   - 2026-09-22 | `host-site-resource-sync-iterate-2026-09-22.md` | domains: [chrome-extension, resource-sync, testing] | topics: [localStorage, refresh-race, pause-resume, resource-sync] | status: completed
@@ -24,7 +28,10 @@ status: active
 
 # Session memory index
 
+- [2026-09-23 — Host site resource sync Phase 4](host-site-resource-sync-phase-4-2026-09-23.md): client applies authorized inbound upserts; host, unpaired, and unauthorized frames do not write. Cookie fidelity includes host-only omission and partition keys. localStorage reuses or opens one background tab per origin and closes only feature-opened tabs. Review passed with no in-plan defects. Guardrails pass. Next: commit, then a client origin grant before Phase 5 smoke. [Phase](../2026-09-22.host-site-resource-sync/phase-4-resource-client-apply.md).
 - [2026-09-22 — Host site resource sync Phase 3](host-site-resource-sync-phase-3-2026-09-22.md): persistent identity-only subscriptions and pause-aware localStorage watches. Follow-up review passed after chaining refreshes on a tail queue so a tab close during an in-flight read stays paused. Next: Phase 4. [Phase](../2026-09-22.host-site-resource-sync/phase-3-resource-live-watches.md).
+
+
 
 - [2026-09-22 — Host site resource sync Phase 2](host-site-resource-sync-phase-2-2026-09-22.md): authorized-host site picker, user-gesture per-origin permission, metadata-only cookie/localStorage lists, unreadable-storage state, options-only worker routing, and partition-aware cookie identity/display. Browser smoke and durable guardrails pass; review iteration adds a 436-test light-gate pass. Next: re-review, then Phase 3. [Phase](../2026-09-22.host-site-resource-sync/phase-2-resource-site-panel.md).
 
